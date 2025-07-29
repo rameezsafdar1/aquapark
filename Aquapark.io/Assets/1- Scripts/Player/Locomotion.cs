@@ -4,8 +4,9 @@ using DG.Tweening;
 
 public class Locomotion : MonoBehaviour
 {
+    #region Variables
     [Header("References")]
-    [SerializeField] private SplineFollower splineFollower;
+    public SplineFollower splineFollower;
     [SerializeField] private Animator anim;
     public Transform modelTransform;
     [SerializeField] private CharacterController _controller;
@@ -23,7 +24,7 @@ public class Locomotion : MonoBehaviour
     [SerializeField] private float gravity = -9.8f;
 
     [Header("Landing Detection")]
-    [SerializeField] private LayerMask groundLayer;
+    [SerializeField] private LayerMask groundLayer, runLayer;
     [SerializeField] private float raycastDistance = 1.2f;
 
     private float xValue;
@@ -35,14 +36,36 @@ public class Locomotion : MonoBehaviour
     [SerializeField] private float rotationSpeed = 0.2f;
     [Tooltip("When localMotion offset of spline follower reaches this point, the rotationAngle will be reached completely")]
     [SerializeField] private float rotationReachPoint;
+    [SerializeField] private Animator shakeAnim;
+    [HideInInspector] public float initialSpeed;
+    private bool collidedFinish;
+
+    #endregion
+
+    private void Start()
+    {
+        initialSpeed = splineFollower.followSpeed;
+    }
 
     private void Update()
     {
+        if (!GameManager.Instance.gameStarted && !GameManager.Instance.gameOver)
+        {
+            if (Input.GetKeyDown(KeyCode.Mouse0))
+            {
+                StartShake();
+            }
+            if (Input.GetKeyUp(KeyCode.Mouse0))
+            {
+                ShakeComplete();
+            }
+        }
 
-        if (GameManager.Instance.gameOver)
+        if (GameManager.Instance.gameOver || !GameManager.Instance.gameStarted)
         {
             return;
         }
+
 
         if (!inAir)
         {
@@ -51,13 +74,12 @@ public class Locomotion : MonoBehaviour
         }
         else
         {
-            HandleAirMovement();
-
             timeInAir += Time.deltaTime;
             if (timeInAir >= 0.5f)
             {
                 CheckForLanding();
             }
+            HandleAirMovement();
         }
 
         if (Input.GetKeyDown(KeyCode.Space))
@@ -65,6 +87,17 @@ public class Locomotion : MonoBehaviour
             gravity = jumpUpForce;
         }
 
+    }
+
+    void StartShake()
+    {
+        shakeAnim.enabled = true;
+    }
+
+    public void ShakeComplete()
+    {
+        shakeAnim.enabled = false;
+        modelTransform.DOLocalMove(Vector3.zero, 0.1f).SetEase(Ease.OutSine);
     }
 
     private void HandleSplineMovement()
@@ -134,6 +167,36 @@ public class Locomotion : MonoBehaviour
         {
             LandBackOnSpline();
         }
+
+        RaycastHit hit;
+
+        if (Physics.Raycast(ray, out hit, raycastDistance, runLayer))
+        {
+            if (hit.transform.tag == "Dead")
+            {
+                GameManager.Instance.gameOver = true;
+                Die();
+            }
+
+            else if (hit.transform.tag == "poolWater")
+            {
+                if (!GameManager.Instance.gameOver)
+                {
+                    GameManager.Instance.gameOver = true;
+                    GameManager.Instance.endCam.SetActive(true);
+                    PlayDiveIn();
+                }
+            }
+
+            else
+            {
+                anim.SetBool("Running", true);
+            }
+        }
+        else
+        {
+            anim.SetBool("Running", false);
+        }
     }
 
     private void LandBackOnSpline()
@@ -165,6 +228,7 @@ public class Locomotion : MonoBehaviour
             _effects.waterTrail[i].gameObject.SetActive(true);
         }
         _effects.LandFloatie();
+        anim.SetBool("Running", false);
         GameManager.Instance.aiManager.SetAiDynamically();
     }
 
@@ -181,6 +245,16 @@ public class Locomotion : MonoBehaviour
             }
         }
 
+        //if (other.CompareTag("poolWater"))
+        //{
+        //    if (!GameManager.Instance.gameOver)
+        //    {
+        //        GameManager.Instance.gameOver = true;
+        //        GameManager.Instance.endCam.SetActive(true);
+        //        PlayDiveIn();
+        //    }
+        //}
+
         if (other.CompareTag("Jumper"))
         {
             JumpOffSpline();
@@ -189,10 +263,55 @@ public class Locomotion : MonoBehaviour
 
     private void PlayEndSequence()
     {
-        splineFollower.followSpeed = 10;
-        splineFollower.spline = GameManager.Instance.endSpline;
-        splineFollower.SetPercent(0);
+        collidedFinish = true;
+        splineFollower.follow = false;
         anim.SetBool("Dive", true);
+        
+        modelTransform.DOLocalRotate(new Vector3(0f, 0f, 0f), rotationSpeed);
+        modelTransform.DOLocalMove(new Vector3(0f, 0f, 0f), rotationSpeed);
+
+        Quaternion rot = transform.rotation;
+        rot.x = 0;
+        rot.z = 0;
+        transform.rotation = rot;
+
+        gravity = 10;
+
+        for (int i = 0; i < _effects.waterTrail.Length; i++)
+        {
+            _effects.waterTrail[i].Stop();
+        }
+
+        _effects.NoFloatie();
+
+        Vector3 pos = transform.position;
+
+        transform.DOLocalJump(new Vector3(pos.x + 20, pos.y - 15f, pos.z), 15, 1, 2f).OnComplete(() => DiveOut(6f));
+    }
+    private void DiveOut(float outValue)
+    {
+        Vector3 pos = transform.position;
+        transform.DOMove(new Vector3(pos.x, pos.y + outValue, pos.z), 3f);
     }
 
+    private void PlayDiveIn()
+    {
+        if (!collidedFinish)
+        {
+            modelTransform.DOLocalRotate(new Vector3(0f, 0f, 0f), rotationSpeed);
+            modelTransform.DOLocalMove(new Vector3(0f, 0f, 0f), rotationSpeed);
+            splineFollower.follow = false;
+            anim.SetBool("Dive", true);
+            Vector3 pos = transform.position;
+            transform.DOMove(new Vector3(pos.x, pos.y -15f, pos.z), 1.5f).OnComplete(() => DiveOut(9.3f));
+            _effects.NoFloatie();
+        }
+    }
+
+    private void Die()
+    {
+        splineFollower.follow = false;
+        anim.SetBool("Die", true);
+        _effects.NoFloatie();
+    }
 }

@@ -1,8 +1,6 @@
 using DG.Tweening;
 using Dreamteck.Splines;
-using Unity.Android.Gradle.Manifest;
 using UnityEngine;
-using static UnityEngine.Rendering.DebugUI;
 
 public class AiMover : MonoBehaviour
 {
@@ -11,11 +9,16 @@ public class AiMover : MonoBehaviour
     [SerializeField] private CharacterController _controller;
     [SerializeField] private float airSpeed = 7f;
     [SerializeField] private Animator anim;
-    [SerializeField] private float minimumDelay, maximumDelay, sideLength, moveSpeed, yOffset, jumpForce, raycastDistance;
+    [SerializeField] private float minimumDelay, maximumDelay, sideLength, moveSpeed, yOffset, jumpForce, raycastDistance, sideSpeed = 2;
     [SerializeField] private LayerMask groundLayer;
     [SerializeField] private Transform characterModel;
     private float delay, timePassed, moveDis, gravity, timeInAir;
     private bool inAir;
+    private float horizontalValue, horizontalTime;
+    private Vector3 moveDir;
+    private bool collidedFinish;
+    [SerializeField] private GameObject[] skins;
+
 
     private void Start()
     {
@@ -27,6 +30,11 @@ public class AiMover : MonoBehaviour
 
         characterModel.DOLocalRotate(new Vector3(0f, 0f, targetRotationZ), 0f);
         delay = Random.Range(minimumDelay, maximumDelay);
+
+        int randomSkin = Random.Range(0, skins.Length);
+
+        skins[randomSkin].SetActive(true);
+
     }
 
     private void Update()
@@ -40,7 +48,7 @@ public class AiMover : MonoBehaviour
         {
             HandleAirMovement();
             timeInAir += Time.deltaTime;
-            if (timeInAir >= 0.5f)
+            if (timeInAir >= 1f)
             {
                 CheckForLanding();
             }
@@ -85,8 +93,18 @@ public class AiMover : MonoBehaviour
     private void HandleAirMovement()
     {
         gravity -= airSpeed * Time.deltaTime;
+        if (horizontalTime <= 0.3f)
+        {
+            moveDir += transform.right * horizontalValue * sideSpeed;
+            horizontalTime += Time.deltaTime;
+        }
 
-        Vector3 moveDir = transform.forward * airSpeed;
+        else
+        {
+            moveDir = transform.forward * airSpeed;
+        }
+
+
         moveDir.y = gravity;
 
         _controller.Move(moveDir * Time.deltaTime);
@@ -120,14 +138,23 @@ public class AiMover : MonoBehaviour
     {
         SplineFollower splineFollower = GetComponent<SplineFollower>();
         splineFollower.followSpeed = 10;
+        splineFollower.motion.offset = new Vector2(Random.Range(-3, 3), 0);
         splineFollower.spline = GameManager.Instance.endSpline;
         splineFollower.SetPercent(0);
         anim.SetBool("Dive", true);
     }
 
-    public void Jump()
+    public void Jump(float value)
     {
+        horizontalValue = value;
+        horizontalTime = 0;
         anim.SetBool("inAir", true);
+        Quaternion rot = transform.rotation;
+        rot.x = 0;
+        rot.z = 0;
+
+        transform.rotation = rot;
+
         characterModel.DOLocalMove(Vector3.zero, 0.1f);
         characterModel.DOLocalRotate(Vector3.zero, 0.1f);
         follower.follow = false;

@@ -3,9 +3,9 @@ using UnityEngine;
 public class AiEffects : MonoBehaviour
 {
     private int currentFloatie;
-    [SerializeField] private GameObject[] Floaties, FloatiesInHand;
+    public GameObject[] Floaties, FloatiesInHand;
 
-    private void Start()
+    public void SelectFloatie()
     {
         currentFloatie = Random.Range(0, Floaties.Length);
         Floaties[currentFloatie].SetActive(true);
@@ -29,5 +29,14 @@ public class AiEffects : MonoBehaviour
             FloatiesInHand[i].SetActive(false);
         }
         Floaties[currentFloatie].SetActive(true);
+    }
+
+    public void NoFloatie()
+    {
+        for (int i = 0; i < Floaties.Length; i++)
+        {
+            Floaties[i].SetActive(false);
+            FloatiesInHand[i].SetActive(false);
+        }
     }
 }

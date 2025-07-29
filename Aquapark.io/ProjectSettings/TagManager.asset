@@ -12,6 +12,7 @@ TagManager:
   - topPoolWater
   - Agent
   - Jumper
+  - Dead
   layers:
   - Default
   - TransparentFX
@@ -22,7 +23,7 @@ TagManager:
   - Slide
   - Player
   - Agent
-  - 
+  - Walkable
   - 
   - 
   - 

@@ -38,9 +38,9 @@ public class AiPush : MonoBehaviour
         MainAi.follower.followSpeed += pushValue;
     }
 
-    public void Jump()
+    public void Jump(float horizontalValue)
     {
-        MainAi.Jump();
+        MainAi.Jump(horizontalValue);
     }
 
     private void OnTriggerEnter(Collider other)
@@ -71,7 +71,7 @@ public class AiPush : MonoBehaviour
                 AiPush push = other.GetComponent<AiPush>();
                 if (push != null)
                 {
-                    push.Jump();
+                    push.Jump(1);
                 }
             }
             else
@@ -79,7 +79,7 @@ public class AiPush : MonoBehaviour
                 AiPush push = other.GetComponent<AiPush>();
                 if (push != null)
                 {
-                    push.Jump();
+                    push.Jump(-1);
                 }
             }
         }
