@@ -39,7 +39,7 @@ public class AiMover : MonoBehaviour
 
     private void Update()
     {
-        if (!GameManager.Instance.gameStarted)
+        if (!GameManager.Instance.gameStarted || GameManager.Instance.gameOver)
         {
             return;
         }
@@ -138,10 +138,13 @@ public class AiMover : MonoBehaviour
     {
         SplineFollower splineFollower = GetComponent<SplineFollower>();
         splineFollower.followSpeed = 10;
-        splineFollower.motion.offset = new Vector2(Random.Range(-3, 3), 0);
         splineFollower.spline = GameManager.Instance.endSpline;
+        splineFollower.motion.offset = new Vector2(Random.Range(-3, 3), 0);
+        characterModel.DOLocalMove(new Vector3(0, 0, Random.Range(0, 4)), 0.1f);
+        characterModel.DOLocalRotate(Vector3.zero, 0.1f);
         splineFollower.SetPercent(0);
         anim.SetBool("Dive", true);
+        Effects.NoFloatie();
     }
 
     public void Jump(float value)
