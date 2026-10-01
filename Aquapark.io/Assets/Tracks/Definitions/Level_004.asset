@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 391cf6f62913e8341b67d3d995b03164, type: 3}
+  m_Name: Level_004
+  m_EditorClassIdentifier: Assembly-CSharp-Editor::TrackDefinition
+  levelNumber: 4
+  seed: 3404
+  length: 1040
+  pointSpacing: 12
+  startStraight: 40
+  finishStraight: 120
+  turnRate: 0.118922725
+  turnChangeLength: 254
+  maxYawDegrees: 34.30438
+  slopeAngle: 9.908345
+  slopeVariation: 4
+  steepSections: 1
+  steepAngle: 25.099722
+  steepSectionLength: 140
+  flatSections: 3
+  flatSectionLength: 120
+  maxPitch: 50
+  finishPitch: 18
+  loopCount: 2
+  loopMinPercent: 0.1
+  loopMaxPercent: 0.92
+  loopRadius: 44
+  loopTurns: 1
+  loopGap: 30
+  loopDirection: 3
+  loopMinClearance: 14
+  bankGain: 60
+  maxBank: 30
+  floorHalfWidth: 1.9
+  wallRadius: 3.2
+  wallSweepDegrees: 62
+  wallThickness: 0.7
+  tubeSegmentLength: 3.5
+  tubeMaterial: {fileID: 0}
+  fountainCount: 1
+  fountainMinPercent: 0.2
+  fountainMaxPercent: 0.7
+  fountainMinSpacing: 80
+  fountainMaxPitch: 14
+  fountainMaxTurnRate: 0.2
+  fountainPrefab: {fileID: 0}
+  playerSpeed: 25
+  aiSpeedMin: 21
+  aiSpeedMax: 27
+  aiStartSpacing: 15
+  startBoostDuration: 5

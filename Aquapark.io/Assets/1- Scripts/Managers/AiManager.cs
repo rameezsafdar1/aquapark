@@ -43,6 +43,27 @@ public class AiManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Puts the player and every AI racer on a level's spline and applies that level's race settings.
+    /// Must run before Start() places the racers, so GameManager (which calls this) runs first.
+    /// </summary>
+    public void ApplyLevel(LevelConfig level)
+    {
+        minSpeed = level.aiSpeedMin;
+        maxSpeed = level.aiSpeedMax;
+        startSpacing = level.aiStartSpacingPercent;
+        startBoostDuration = level.startBoostDuration;
+
+        for (int i = 0; i < allAgents.Length; i++)
+        {
+            allAgents[i].spline = level.mainSpline;
+            allAgents[i].followSpeed = Random.Range(minSpeed, maxSpeed);
+        }
+
+        Player.splineFollower.spline = level.mainSpline;
+        Player.splineFollower.followSpeed = level.playerSpeed;
+    }
+
     public void InitAi()
     {
         int playerPos = Random.Range(0, allAgents.Length);
