@@ -21,11 +21,11 @@ public static class TrackGenerator
     public const string DefinitionsDir = RootDir + "/Definitions";
     public const string DatabasePath = RootDir + "/LevelDatabase.asset";
 
-    const string DefaultTubeMaterial = "Assets/2D/SlideTexture.mat";
+    public const string DefaultTubeMaterial = "Assets/3D/level0/Materials/Road.mat";
     const string DefaultFountain = "Assets/5- Prefabs/Jump Fountain.prefab";
     // Top of the tube floor relative to the spline. The landing raycast starts at the spline point, so the floor needs
     // clearance below it, otherwise sharp slope changes can lift the floor above the ray origin.
-    const float FloorY = -0.25f;
+    public const float FloorY = -0.25f;
     const int MaxMeshVertices = 64000;   // Dreamteck meshes use 16-bit indices
 
     public struct Result
@@ -273,7 +273,7 @@ public static class TrackGenerator
     }
 
     // Segments are shared between levels that use the same tube shape.
-    static string SegmentMeshPath(TubeProfileBuilder.Settings s)
+    public static string SegmentMeshPath(TubeProfileBuilder.Settings s)
     {
         string key = string.Format(CultureInfo.InvariantCulture, "f{0:0.00}_r{1:0.00}_s{2:0}_t{3:0.00}_y{4:0.00}", s.floorHalfWidth, s.radius, s.sweepDegrees, s.thickness, -s.floorY);
         return $"{TubeProfileBuilder.MeshFolder}/TubeSegment_{key}.asset";

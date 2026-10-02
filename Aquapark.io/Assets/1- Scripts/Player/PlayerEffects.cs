@@ -11,11 +11,21 @@ public class PlayerEffects : MonoBehaviour
     public GameObject windLines;
     [SerializeField] private int currentFloatie;
 
+    [SerializeField] private AvatarPass[] Skins;
+
     private void Start()
     {
-        LandFloatie();
+        for (int i = 0; i < Skins.Length; i++)
+        {
+            if (Skins[i].gameObject.activeSelf)
+            {
+                foreach (var particle in Skins[i].waterTrail)
+                {
+                    particle.gameObject.SetActive(false);
+                }
+            }
+        }
     }
-
 
     public void AirFloatie()
     {
@@ -41,6 +51,23 @@ public class PlayerEffects : MonoBehaviour
         waterWaveParticle.SetActive(true);
         glider.SetActive(false);
         projector.SetActive(false);
+        waterWaveParticle.SetActive(true);
+    }
+
+    public void LoadParticles()
+    {
+        for (int i = 0; i < Skins.Length; i++)
+        {
+            if (Skins[i].gameObject.activeSelf)
+            {
+                foreach (var particle in Skins[i].waterTrail)
+                {
+                    particle.gameObject.SetActive(true);
+                }                
+            }
+        }
+
+        GetComponent<Animator>().SetBool("Start", true);
     }
 
     public void NoFloatie()

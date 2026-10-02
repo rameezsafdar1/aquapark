@@ -1,6 +1,7 @@
 using Dreamteck.Splines;
 using System.Collections;
 using TMPro;
+using Unity.Cinemachine;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -11,6 +12,8 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance;
     public bool gameOver, gameStarted;
+    /// <summary>True when the race ended because the player died instead of finishing.</summary>
+    [HideInInspector] public bool playerFailed;
     public GameObject endCam;
     public SplineComputer endSpline;
     public AiManager aiManager;
@@ -25,6 +28,17 @@ public class GameManager : MonoBehaviour
 
     /// <summary>The level that is being played, or null when the scene's own level is used.</summary>
     public LevelConfig CurrentLevel { get; private set; }
+    [Header("Menu lobby")]
+    [Tooltip("Short straight tube the player waits on in the menu. When Play is pressed the screen fades and the racers are moved onto the real level. Leave empty to start on the level directly.")]
+    [SerializeField] private MenuLobby lobby;
+    [SerializeField] private float fadeSeconds = 0.35f;
+
+    /// <summary>Raised while the screen is black, right after the racers were moved onto the level.</summary>
+    public event System.Action RaceSwapped;
+
+    /// <summary>True while the player is waiting on the menu lobby (so Play starts with a fade to the level).</summary>
+    public bool UsesLobby => lobby != null && lobby.gameObject.activeSelf;
+
     private int startWait;
     [SerializeField] private TextMeshProUGUI startText;
     [Header("Start UI")]
@@ -55,6 +69,7 @@ public class GameManager : MonoBehaviour
         startWait = 3;
 
         LoadRandomLevel();
+        SetUpLobby();
 
         if (startButton != null)
         {
@@ -119,7 +134,34 @@ public class GameManager : MonoBehaviour
         aiManager.ApplyLevel(CurrentLevel);
     }
 
-    /// <summary>Called by the Start button: hides it and runs the 3-2-1 countdown, then the race begins.</summary>
+    private void SetUpLobby()
+    {
+        if (lobby == null)
+        {
+            return;
+        }
+
+        // After "Next race" the player skips the menu, so there is no lobby to wait in.
+        if (UIManager.StartNextRaceImmediately || aiManager == null)
+        {
+            lobby.gameObject.SetActive(false);
+            return;
+        }
+
+        lobby.gameObject.SetActive(true);
+        aiManager.EnterLobby(lobby);
+
+        // The real level stays hidden until the race starts, so it is not visible beyond the lobby.
+        if (CurrentLevel != null)
+        {
+            CurrentLevel.gameObject.SetActive(false);
+        }
+    }
+
+    /// <summary>
+    /// Called by the Start button: hides it, fades from the lobby to the level (when there is a lobby),
+    /// then runs the 3-2-1 countdown and the race begins.
+    /// </summary>
     public void BeginCountdown()
     {
         if (timerStarted || gameStarted)
@@ -134,7 +176,39 @@ public class GameManager : MonoBehaviour
             startButton.gameObject.SetActive(false);
         }
 
-        StartCoroutine(startTimer());
+        StartCoroutine(BeginRoutine());
+    }
+
+    private IEnumerator BeginRoutine()
+    {
+        if (lobby != null && lobby.gameObject.activeSelf)
+        {
+            yield return ScreenFade.Out(fadeSeconds);
+
+            if (CurrentLevel != null)
+            {
+                CurrentLevel.gameObject.SetActive(true);
+            }
+
+            Transform player = aiManager.PlayerTransform;
+            Vector3 before = player.position;
+            aiManager.EnterRace();
+            lobby.gameObject.SetActive(false);
+            yield return null;   // let the followers settle on the level
+
+            // Stop the follow camera from swooping across the map to catch up.
+            Vector3 delta = player.position - before;
+            foreach (CinemachineCamera cam in FindObjectsByType<CinemachineCamera>(FindObjectsSortMode.None))
+            {
+                cam.OnTargetObjectWarped(player, delta);
+            }
+
+            RaceSwapped?.Invoke();
+            yield return null;
+            yield return ScreenFade.In(fadeSeconds);
+        }
+
+        yield return startTimer();
     }
 
     private IEnumerator startTimer()
@@ -175,6 +249,15 @@ public class GameManager : MonoBehaviour
 
         int minutes = (int)(raceTime / 60f);
         raceTimerText.text = $"{minutes}:{raceTime % 60f:00.0}";
+    }
+
+    /// <summary>Hides the race clock (the results screen replaces it).</summary>
+    public void HideRaceTimer()
+    {
+        if (raceTimerText != null)
+        {
+            raceTimerText.gameObject.SetActive(false);
+        }
     }
 
     public void RestartLevel()

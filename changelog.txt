@@ -1,0 +1,151 @@
+AQUAPARK CHANGELOG
+Every change made in this project is logged here (newest at the bottom).
+==========================================================================
+
+[Before changelog - recap from git history / notes]
+- Level generator (Assets/Editor/Tracks/*, TubeProfileBuilder): 50 procedural
+  Dreamteck-spline slide levels in Assets/Tracks/Levels, picked at random by
+  GameManager at runtime (LevelDatabase / LevelConfig).
+- Loops, level-length ramp (30-45 s), water ribbon template (TrackSpline.prefab).
+- Full game UI (menu, shop, skins, daily, spin, settings, HUD, results) in
+  Assets/1- Scripts/UI + Assets/Editor/UI builder; glossy main menu using
+  "Glossy Cartoon Game UI Kit" sprites.
+- Game hooks: AiManager rank/progress, GameManager.playerFailed, Start button + countdown.
+
+[2026-10-02] Start-of-track wooden deck (planned)
+- Request: reference shot shows wooden deck platforms on both sides of the
+  track for the first few metres. Add this to every generated level.
+- Decisions: 25 m long, no rails, patch existing prefabs in place.
+- NEW Assets/Editor/Tracks/StartDeck.cs: builds a "Start Deck" child (cube boards,
+  5 m wide each side, 0.8 m thick, top just under the tube lip, starts 3 m behind
+  the start line and runs 25 m). Menu: Aquapark > Tracks > Add Start Decks To All Levels
+  (idempotent: replaces any existing deck). No colliders, so player/AI landing
+  raycasts are unaffected. Also checks the first 30 m for sideways drift.
+- TrackDefinition: new fields startDeckLength (25), startDeckWidth (5), startDeckMaterial.
+- TrackGenerator: now adds the deck on every generation; FloorY made public.
+- NEW Assets/Tracks/Textures/DeckPlanks.png + Assets/Tracks/Templates/DeckWood.mat
+  (plank texture, Standard shader) used by the deck.
+- Ran the patch on all 50 Level_###.prefab files (all updated).
+- Straight start: checked all 50 levels; every spline stays dead straight along +X
+  for the first 30 m (max sideways drift 0.00 m, startStraight = 40 in all
+  definitions, loops cannot begin before 140 m). No path code change needed.
+- Verified by rendering Level_003's start in the editor (preview only, scene not saved).
+
+[2026-10-02] Menu lobby + fade (done, tested in Play mode)
+- Request: planks only on a new 50 m straight water tube used for the main menu;
+  remove planks from all real levels; on Play fade out/in and move player + AI
+  onto the real level.
+- NEW 1- Scripts/Levels/MenuLobby.cs, 1- Scripts/UI/Core/ScreenFade.cs (runtime black fade).
+- AiManager: EnterLobby (park player on lobby spline, hide AI) / EnterRace (move all onto the level, build grid).
+- GameManager: lobby field, BeginRoutine (fade out -> EnterRace -> camera warp -> fade in -> 3-2-1), RaceSwapped event, UsesLobby.
+- UIManager: on Play with a lobby it waits for RaceSwapped before switching to the race HUD.
+- Editor: LobbyBuilder.cs (Aquapark > Tracks > Build Menu Lobby); StartDeck now has
+  RemoveFromAllLevels; start-deck fields removed from TrackDefinition / generator hook removed.
+- Built Assets/Tracks/Lobby/MenuLobby.prefab (50 m straight flat tube + water + wooden deck
+  along the whole tube, same tube shape as real levels). Placed in gameplay.unity at
+  (-500, 0, 0) and assigned to GameManager.lobby. Scene saved.
+- Removed "Start Deck" from all 50 level prefabs (deck is lobby-only now).
+- MenuLobby.Awake rebuilds its spline (it is moved after being built, so cached samples were stale).
+- GameManager hides the chosen level during the menu and shows it at the swap.
+- Tested in Play mode: menu shows player on the lobby; Play -> fade -> player and 11 AI
+  on Level_033 -> HUD -> countdown -> race runs. "Next race" skips the lobby.
+- Not tested: visual look of the fade itself, other devices/aspect ratios.
+
+[2026-10-02] Figma check
+- Connected to Figma (Rameez Safdar, Starter team). Opened file "Aqua Race - Hypercasual UI"
+  (key g4GxStdzlbOUgxaupwGOyS): Components + 7 screens at 390x844 (Home, In-Race HUD,
+  Race Results, Shop, Skins, Daily Reward, Lucky Spin). Read-only, nothing changed in the project.
+
+[2026-10-02] Figma UI import - BLOCKED (nothing changed in the project)
+- Request: delete current UI, rebuild all screens from Figma (skip VIP and LV 8 locked
+  buttons, Spin takes the VIP place). Do not touch the user's lobby code.
+- Figma MCP hit the Starter plan limit (20 read calls/month), so get_design_context /
+  download_assets are refused. Only Home and In-Race HUD screenshots were fetched
+  (scratchpad). Current UI was NOT deleted, since it cannot be rebuilt yet.
+- Needs: Figma plan/seat upgrade or reset, or exported PNGs of each screen + assets.
+
+[2026-10-02] Figma REST API works (bypasses MCP limit)
+- User supplied a personal access token; stored in figma_token.txt (gitignored). Fetched the
+  whole file once to figma_data/file.json (gitignored). 200 OK.
+- Fonts used in the design: Lilita One 400 (147 text layers) and Fredoka 700 (27). Both Google Fonts.
+- File has 41 components, frames: Components, 01 Home ... 07 Lucky Spin.
+- Still no UI deleted / built yet; waiting for go-ahead on scaling + token revoke.
+
+[2026-10-02] Figma UI import - STARTED (user said go ahead)
+- Old UI deleted (untracked, so not in git): 1- Scripts/UI/Core (except ScreenFade.cs), /Panels, /Screens,
+  Editor/UI (old builder), Assets/UI/{Data,Prefabs,Sprites} (incl. old SkinDatabase.asset + kit sprites).
+  KEPT: ScreenFade.cs, UI/Data/* (SaveData, CurrencyManager, RewardTimers, Services, SkinDatabase), lobby code,
+  GUI PRO Kit + Glossy kit png (third-party assets, not deleted).
+- Pipeline (figma_data/, gitignored): export.py pulls units from Figma REST API at 3x (dynamic text painted out),
+  gen.py draws live pieces (bars, cards, panels) procedurally, sprites.json describes everything.
+  Output: Assets/UI/Figma/Sprites (~137 PNGs) + Fonts (Lilita One, Fredoka Bold - Google Fonts, OFL).
+- Scene Canvas still has the old children until the new builder runs.
+- Runtime UI scripts written (1- Scripts/UI/Core + Screens): UIManager, HomeScreen, ShopScreen, SkinsScreen/SkinCardView,
+  DailyPopup/DayCardView, SpinScreen, RaceHud, ResultsScreen, Pause/Settings/Reward popups, Toast, FooterNav,
+  SegmentedControl, CurrencyBar, PressFx, UIPanel. Data layer extended: SaveData.BonusSpins/CoinBoostRaces,
+  SkinData unlock type/rarity/card colour.
+- Editor builder written (Editor/AquaUI: AquaUIBuilder*.cs, AquaUIShot.cs). Menu: Aquapark > UI > Import Figma Assets / Rebuild UI.
+- Imported all assets (Aquapark > UI > Import Figma Assets) and built the UI in gameplay.unity (Aquapark > UI > Rebuild UI In Open Scene).
+  Compared every screen against the Figma PNGs via AquaUIShot; fixed: sprite mesh type (FullRect), 9-slice scaling, text outline
+  (TMP face dilate), old SafeArea/HUD removal (race timer lifted out), dim sprite padding.
+
+[2026-10-02] Figma UI import - DONE (tested in Play mode)
+- Built in gameplay.unity under Canvas/AquaUI: Menu (Home, Shop, Skins, Spin, Footer, Daily popup), Hud, Results, Settings/Reward/Pause popups, Toast.
+  Home: VIP and LV 8 locked tab skipped, Spin button moved into the VIP slot (bottom right). Ranks tab shows a "coming soon" toast.
+- GameManager.startButton = footer Play button. New GameManager.HideRaceTimer() (called when results show). Race Timer text moved out of the old HUD.
+- Verified in Play: menu pages open/close, Play -> fade -> HUD with live rank, race end -> Results (rank, top-3 board, rewards, claim).
+- SkinManager.Initialise now resets a saved equipped skin that no longer exists (old skin ids from the previous UI).
+- Fonts: Lilita One + Fredoka Bold (TMP SDF assets in Assets/UI/Figma/Fonts, generated outline materials in Fonts/Materials).
+- NOT wired / placeholders: Boost button (toast only), Ranks, Hats/Trails tabs, Coins tab in Shop, knockout/perfect-jump popups
+  (RaceHud.ShowKnockout / ShowCombo exist but nothing calls them), AdService/PurchaseService stubs still grant instantly.
+- Noticed (not changed): PlayerEffects.Start loops `i <= Skins.Length` -> IndexOutOfRangeException every Play (user's file).
+
+[2026-10-02] Home: Spin button moved into the footer
+- Hand-edited in the scene (no code): SpinTile, SpinBanner, SpinBadge, SpinButton moved from AquaUI/Menu/Home to AquaUI/Menu/Footer,
+  scaled to 0.72 and placed in the free slot right of Ranks (design centre 348, 783). The bottom-right spot is empty again.
+- Because the footer shows on Home, Shop and Skins, Spin is reachable from all three. HomeScreen references still work (same objects).
+- Note: Aquapark > UI > Rebuild UI would put Spin back in the old place (builder not updated, by agreement).
+
+[2026-10-02] Footer rebuilt from separate pieces (replaces the 3 baked footer PNGs)
+- Why: the old footer was 3 full-bar pictures (home / shop-selected / skins-selected) swapped on tab changes, and the cover patch that
+  removed the LV 8 tab also erased the bar's rounded RIGHT corner. Figma's footer has both top corners rounded (radius 28).
+- Now: footer_bar.png (one bar picture, both top corners rounded, drawn from the Figma values), navcircle_pink/blue/yellow (tab circles),
+  navtab_highlight (selected tab), navtab_divider, navicon_shop/skins/trophy/spin (white glyphs cut from the exported components sheet).
+  Labels are live text. Each tab = Highlight + Circle + Icon + Label + invisible Tab button; Spin tab + its red dot sit right of Ranks.
+- FooterNav.cs rewritten: SetVariant now just turns the Shop/Skins highlight on or off (no sprite swapping). HomeScreen.spinButton/Badge
+  point at the footer's Spin tab. Builder (BuildFooter) updated to match, so Rebuild UI gives the same footer.
+- Old footer_home/shop/skins sprites are no longer used (left in Sprites).
+- Verified in Play: Shop/Skins tabs open pages and light their highlight, tapping again returns home, Spin tab opens the wheel, badge shows 1.
+- FIGMA LIMIT: the REST API image export is rate-limited for ~4.6 days (Retry-After 394726 s) after our bulk export. No more Figma pulls until then;
+  the footer icons came from the already-exported components sheet instead.
+
+[2026-10-02] AI catch-up after landing (AiManager.SetAiDynamically) - code done, NOT yet tested in Play
+- Old: every AI behind the player was teleported 3-15 m behind (percent based) -> visible pop-in next to the camera.
+- New: AI further behind than the hidden gap (max(35 m, camera distance + 25 m)) are moved to that gap behind the camera
+  (6 m spacing between them, never pushed further back) and get a +10-15% speed boost. AI already closer are left alone.
+  Boost ends when the AI is within 12 m of the player or after 15 s; the normal speed is restored. All values are inspector fields.
+- Gaps use metres (level trackLength), not spline percent. Compiles with no errors.
+- Still to verify in Play: stage a landing with AI far behind and check positions/speeds (staging test was started, not finished).
+
+[2026-10-03] EndZone: coconut palms added
+- Assets/Tracks/Templates/EndZone.prefab: new "Palms" group with 132 coconut tree instances (seeded, so the layout is repeatable):
+  lush backdrop behind the pool (+X side), thinner flanks, some on the camera side, and 10 small groves near the pool.
+  Trees stay out of an exclusion zone around the pool box and the finish area, sit on the sand (y -24.75), have random turn/lean and
+  scale 0.8-1.5x (base 280x: the FBX imports only 5 cm tall because of file scale 0.01, so 280x is about 14 m).
+- Material coconut_tree_mat: GPU instancing enabled (678 tris per tree, ~90k tris total).
+- Level prefabs pick the change up automatically (they contain the EndZone prefab).
+- Your hand-placed "coconut tree" was left as is: it is 5 cm tall at scale 1 and sits ~1 km away at ocean level (x -1086, y -129, z 737),
+  so it is effectively invisible. Delete it or tell me to.
+- Checked with temporary renders (end-camera angle + overview); no scene changes saved.
+
+[2026-10-03] Road texture on tracks + beach props in the EndZone
+- Tracks: tube material is now Assets/3D/level0/Materials/Road.mat (Unlit, "Road Texture": alternating white/blue bands, lighter centre lane)
+  instead of Assets/2D/SlideTexture.mat. Applied to all 50 level prefabs and MenuLobby.prefab (Slide Tube MeshRenderer).
+  TrackGenerator.DefaultTubeMaterial changed too, so regenerated levels and the lobby builder use it. One texture repeat per 3.5 m tube
+  piece (bands ~1.75 m). Unlit = no shading, same as the old road mesh in == Unused.
+- Props: prefabs created in Assets/Tracks/Props from the scene's == Unused objects (Beach / Start Props): Hut_01, Hut_03, HutHigh_01,
+  Hammock_01, BeachNet_01, Towel_01/06, Board_01-03, Ball_10, PalmTree_02, Pot_Palmtree_02 (scale reset to 1, colliders removed).
+  The scene objects in == Unused were not changed.
+- EndZone.prefab: new "BeachProps" group (87 objects): 7 camps around the pool (hut facing the pool, 3 PalmTree_02, 2 potted palms,
+  hammock, volleyball net, towels, boards, ball) + 3 tall lookout huts further out. Coconut palms that would grow through huts were removed
+  (115 coconut palms remain). Huts ~3.4x, props ~3.2x, to match the 14 m palms.

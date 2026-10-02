@@ -310,6 +310,7 @@ public class Locomotion : MonoBehaviour
 
     private void Die()
     {
+        GameManager.Instance.playerFailed = true;
         splineFollower.follow = false;
         anim.SetBool("Die", true);
         _effects.NoFloatie();

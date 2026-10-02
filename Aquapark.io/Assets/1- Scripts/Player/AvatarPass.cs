@@ -8,7 +8,7 @@ public class AvatarPass : MonoBehaviour
     [SerializeField] private PlayerEffects Effects;
     [SerializeField] private AiEffects aiEffects;
     [SerializeField] private GameObject[] FloatiesInHand;
-    [SerializeField] private List<ParticleSystem> waterTrail = new List<ParticleSystem>();
+    public List<ParticleSystem> waterTrail = new List<ParticleSystem>();
     public GameObject particlePrefab;
     public string[] targetNames;
 

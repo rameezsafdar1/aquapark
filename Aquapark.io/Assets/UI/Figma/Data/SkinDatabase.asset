@@ -1,0 +1,103 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9f785ffff161536449115466ee368db9, type: 3}
+  m_Name: SkinDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::SkinDatabase
+  skins:
+  - id: penguin
+    displayName: Cool Penguin
+    icon: {fileID: 21300000, guid: ad5fa21e0a5a7124b8ac958f2fcb1843, type: 3}
+    modelPrefab: {fileID: 0}
+    currency: 0
+    price: 0
+    ownedByDefault: 1
+    unlock: 0
+    unlockLevel: 0
+    rarity: 2
+    cardColor: 0
+  - id: pickle
+    displayName: Pickle
+    icon: {fileID: 21300000, guid: e383016504877224385256d40e05162b, type: 3}
+    modelPrefab: {fileID: 0}
+    currency: 0
+    price: 0
+    ownedByDefault: 1
+    unlock: 0
+    unlockLevel: 0
+    rarity: 0
+    cardColor: 1
+  - id: bubble
+    displayName: Bubble
+    icon: {fileID: 21300000, guid: cf5cf70955166da4696d2f910e550af7, type: 3}
+    modelPrefab: {fileID: 0}
+    currency: 0
+    price: 0
+    ownedByDefault: 1
+    unlock: 0
+    unlockLevel: 0
+    rarity: 0
+    cardColor: 1
+  - id: duck
+    displayName: Duck
+    icon: {fileID: 21300000, guid: c700c911847828f48b8da82211cdd501, type: 3}
+    modelPrefab: {fileID: 0}
+    currency: 0
+    price: 1500
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 1
+    cardColor: 2
+  - id: shark
+    displayName: Shark
+    icon: {fileID: 21300000, guid: 9f1d8c7fd540bee4997ca42e336c0694, type: 3}
+    modelPrefab: {fileID: 0}
+    currency: 0
+    price: 0
+    ownedByDefault: 0
+    unlock: 2
+    unlockLevel: 0
+    rarity: 1
+    cardColor: 1
+  - id: alien
+    displayName: Alien
+    icon: {fileID: 21300000, guid: 011951a7cdeffcc4e85d7fdded03f126, type: 3}
+    modelPrefab: {fileID: 0}
+    currency: 1
+    price: 80
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 2
+    cardColor: 0
+  - id: fox
+    displayName: Fox
+    icon: {fileID: 21300000, guid: fc40972a846e0cf44b1b033da130d03e, type: 3}
+    modelPrefab: {fileID: 0}
+    currency: 0
+    price: 0
+    ownedByDefault: 0
+    unlock: 3
+    unlockLevel: 12
+    rarity: 1
+    cardColor: 3
+  - id: ghost
+    displayName: Ghost
+    icon: {fileID: 21300000, guid: 8699818e53a243045aa260386a935c77, type: 3}
+    modelPrefab: {fileID: 0}
+    currency: 0
+    price: 0
+    ownedByDefault: 0
+    unlock: 3
+    unlockLevel: 12
+    rarity: 3
+    cardColor: 3
