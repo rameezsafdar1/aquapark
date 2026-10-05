@@ -22,7 +22,7 @@ public static class TrackGenerator
     public const string DatabasePath = RootDir + "/LevelDatabase.asset";
 
     public const string DefaultTubeMaterial = "Assets/3D/level0/Materials/Road.mat";
-    const string DefaultFountain = "Assets/5- Prefabs/Jump Fountain.prefab";
+    const string DefaultFountain = "Assets/VFX/WaterFountain/WaterFountain.prefab";
     // Top of the tube floor relative to the spline. The landing raycast starts at the spline point, so the floor needs
     // clearance below it, otherwise sharp slope changes can lift the floor above the ray origin.
     public const float FloorY = -0.25f;

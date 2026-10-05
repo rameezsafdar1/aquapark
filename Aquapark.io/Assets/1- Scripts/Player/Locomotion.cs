@@ -14,7 +14,7 @@ public class Locomotion : MonoBehaviour
 
     [Header("Side Movement")]
     [SerializeField] private float horizontalSpeed = 5f;
-    [SerializeField] private float jumpThreshold = 2.6f, yOffset;
+    [SerializeField] private float jumpThreshold = 2.6f;
 
     [Header("Forward Speed")]
     [SerializeField] private float airSpeed = 7f;
@@ -29,14 +29,18 @@ public class Locomotion : MonoBehaviour
 
     private float xValue;
     private bool inAir = false;
+    /// <summary>True while the player is off the slide (jumped or fell).</summary>
+    public bool IsInAir => inAir;
     private float timeInAir;
 
     [Header("Rotation Settings")]
-    [SerializeField] private float rotationAngle;
+    [Tooltip("Seconds the model takes to slide sideways. Its height and tilt follow the slide surface (SlideSurface).")]
     [SerializeField] private float rotationSpeed = 0.2f;
-    [Tooltip("When localMotion offset of spline follower reaches this point, the rotationAngle will be reached completely")]
-    [SerializeField] private float rotationReachPoint;
+    [Tooltip("Degrees the player leans when steered to the jump-off edge, so there is tilt on the flat floor too. On the curved wall the wall's own slope is used when it is steeper.")]
+    [SerializeField] private float edgeLeanAngle = 12f;
     [SerializeField] private Animator shakeAnim;
+    [Tooltip("Small speed jitter of the character while riding the slide.")]
+    [SerializeField] private RideBob rideBob = new RideBob();
     [HideInInspector] public float initialSpeed;
     private bool collidedFinish;
 
@@ -106,12 +110,22 @@ public class Locomotion : MonoBehaviour
         xValue += horizontalInput;
         //xValue = Mathf.Clamp(xValue, -maxSideDistance, maxSideDistance);
 
-        float yPos = Mathf.Abs(xValue / rotationReachPoint) * yOffset;
-        modelTransform.DOLocalMove(new Vector3(xValue, yPos, 0), rotationSpeed);
-        
-        float targetRotationZ = (xValue / rotationReachPoint) * rotationAngle;
+        // Only the sideways position is tweened; height and tilt follow the slide surface in LateUpdate.
+        modelTransform.DOLocalMoveX(xValue, rotationSpeed);
+    }
 
-        modelTransform.DOLocalRotate(new Vector3(0f, 0f, targetRotationZ), rotationSpeed);
+    private void LateUpdate()
+    {
+        if (!GameManager.Instance.gameStarted || GameManager.Instance.gameOver || inAir || collidedFinish)
+        {
+            rideBob.Reset();
+            return;
+        }
+
+        // Full lean at the jump-off point (jumpThreshold is in the player's local units).
+        rideBob.Remove(modelTransform);
+        SlideSurface.Follow(transform, modelTransform, groundLayer, edgeLeanAngle, jumpThreshold * transform.lossyScale.x);
+        rideBob.Apply(modelTransform, splineFollower.followSpeed);
     }
 
     private void CheckForJumpOff()
@@ -135,6 +149,7 @@ public class Locomotion : MonoBehaviour
 
         gravity = jumpUpForce;
         anim.SetBool("inAir", true);
+        AudioManager.Play(Sfx.Jump);
         for (int i = 0; i < _effects.waterTrail.Length; i++)
         {
             //_effects.waterTrail[i].enableEmission = false;
@@ -221,6 +236,8 @@ public class Locomotion : MonoBehaviour
         timeInAir = 0;
         _effects.landingEffect.SetActive(true);
         anim.SetBool("inAir", false);
+        AudioManager.Play(Sfx.Land);
+        FollowCamDirector.ShakeLanding();
 
         for (int i = 0; i < _effects.waterTrail.Length; i++)
         {
@@ -266,7 +283,8 @@ public class Locomotion : MonoBehaviour
         collidedFinish = true;
         splineFollower.follow = false;
         anim.SetBool("Dive", true);
-        
+        AudioManager.Play(Sfx.Finish);
+
         modelTransform.DOLocalRotate(new Vector3(0f, 0f, 0f), rotationSpeed);
         modelTransform.DOLocalMove(new Vector3(0f, 0f, 0f), rotationSpeed);
 
@@ -286,7 +304,11 @@ public class Locomotion : MonoBehaviour
 
         Vector3 pos = transform.position;
 
-        transform.DOLocalJump(new Vector3(pos.x + 20, pos.y - 15f, pos.z), 15, 1, 2f).OnComplete(() => DiveOut(6f));
+        transform.DOLocalJump(new Vector3(pos.x + 20, pos.y - 15f, pos.z), 15, 1, 2f).OnComplete(() =>
+        {
+            AudioManager.Play(Sfx.Splash);   // the dive reaches the pool
+            DiveOut(6f);
+        });
     }
     private void DiveOut(float outValue)
     {
@@ -302,6 +324,7 @@ public class Locomotion : MonoBehaviour
             modelTransform.DOLocalMove(new Vector3(0f, 0f, 0f), rotationSpeed);
             splineFollower.follow = false;
             anim.SetBool("Dive", true);
+            AudioManager.Play(Sfx.Splash);   // fell off the track into the pool
             Vector3 pos = transform.position;
             transform.DOMove(new Vector3(pos.x, pos.y -15f, pos.z), 1.5f).OnComplete(() => DiveOut(9.3f));
             _effects.NoFloatie();

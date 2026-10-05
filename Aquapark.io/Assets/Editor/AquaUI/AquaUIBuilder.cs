@@ -319,6 +319,20 @@ public static partial class AquaUIBuilder
         return new Frame(f.x - pad, f.y - pad, f.w + pad * 2f, f.h + pad * 2f);
     }
 
+    /// <summary>
+    /// Makes a full-width strip (vignette, footer bar) stretch to the screen edges on screens wider than the design,
+    /// keeping its designed overhang on each side. Use only on direct children of full-screen containers.
+    /// </summary>
+    private static RectTransform StretchX(RectTransform rt)
+    {
+        float w = rt.sizeDelta.x, cx = rt.anchoredPosition.x;
+        rt.anchorMin = new Vector2(0f, rt.anchorMin.y);
+        rt.anchorMax = new Vector2(1f, rt.anchorMax.y);
+        rt.sizeDelta = new Vector2(w - DW, rt.sizeDelta.y);
+        rt.anchoredPosition = new Vector2(cx, rt.anchoredPosition.y);
+        return rt;
+    }
+
     private static RectTransform NewRect(Transform parent, string name, Frame f, Frame? parentFrame)
     {
         var go = new GameObject(name, typeof(RectTransform));

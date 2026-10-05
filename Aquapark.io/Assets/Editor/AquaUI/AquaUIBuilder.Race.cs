@@ -228,7 +228,9 @@ public static partial class AquaUIBuilder
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(DW, DH);
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0f;
+        // Match height: every screen is DH units tall, so vertical layouts never get squeezed; wider screens
+        // (16:9 phones, tablets) just get more room at the sides. Full-width strips stretch to the edges (StretchX).
+        scaler.matchWidthOrHeight = 1f;
 
         // Keep the countdown and race timer texts GameManager uses; everything else on the canvas is the old UI.
         var keep = new HashSet<Transform>();

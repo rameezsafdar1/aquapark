@@ -17,9 +17,9 @@ public class LevelConfig : MonoBehaviour
     public Transform endCamAnchor;
 
     [Header("Race")]
-    public float playerSpeed = 25f;
-    public float aiSpeedMin = 23f;
-    public float aiSpeedMax = 30f;
+    public float playerSpeed = 27.5f;
+    public float aiSpeedMin = 25.3f;
+    public float aiSpeedMax = 33f;
     [Tooltip("Gap between racers at the start, as a fraction of the spline (0.0045 = 0.45%).")]
     public float aiStartSpacingPercent = 0.0045f;
     public float startBoostDuration = 5f;

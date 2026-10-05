@@ -171,6 +171,7 @@ public class AiManager : MonoBehaviour
             Debug.Log("Init called");
             Animator anim = allAgents[i].GetComponent<Animator>();
             anim.SetBool("Start", true);
+            allAgents[i].GetComponent<AiEffects>().StartRaceEffects();
         }
     }
 

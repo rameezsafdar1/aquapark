@@ -93,13 +93,13 @@ public class TrackDefinition : ScriptableObject
     [Range(0f, 40f)] public float fountainMaxPitch = 14f;
     [Tooltip("Fountains are only placed where the track turns slower than this (degrees per metre).")]
     [Range(0f, 0.6f)] public float fountainMaxTurnRate = 0.2f;
-    [Tooltip("Leave empty to use the default Jump Fountain prefab.")]
+    [Tooltip("Leave empty to use the default Water Fountain prefab.")]
     public GameObject fountainPrefab;
 
     [Header("Race")]
-    public float playerSpeed = 25f;
-    public float aiSpeedMin = 23f;
-    public float aiSpeedMax = 30f;
+    public float playerSpeed = 27.5f;
+    public float aiSpeedMin = 25.3f;
+    public float aiSpeedMax = 33f;
     [Tooltip("Gap between racers at the start, in metres.")]
     [Min(1f)] public float aiStartSpacing = 15f;
     [Tooltip("How long the player's start speed boost lasts (seconds).")]

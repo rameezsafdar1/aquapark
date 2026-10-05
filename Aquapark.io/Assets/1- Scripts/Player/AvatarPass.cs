@@ -23,6 +23,7 @@ public class AvatarPass : MonoBehaviour
         else
         {
             aiEffects.FloatiesInHand = FloatiesInHand;
+            aiEffects.skin = this;
             aiEffects.SelectFloatie();
         }
     }

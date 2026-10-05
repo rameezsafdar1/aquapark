@@ -53,8 +53,8 @@ MonoBehaviour:
   fountainMaxPitch: 14
   fountainMaxTurnRate: 0.2
   fountainPrefab: {fileID: 0}
-  playerSpeed: 25
-  aiSpeedMin: 23.5
-  aiSpeedMax: 29.5
+  playerSpeed: 27.5
+  aiSpeedMin: 25.8
+  aiSpeedMax: 32.4
   aiStartSpacing: 15
   startBoostDuration: 5

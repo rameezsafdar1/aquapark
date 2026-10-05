@@ -31,8 +31,8 @@ public class TrackBatchSettings
     public RampRange steepAngle = new RampRange(26f, 40f);
     public RampRange flatSections = new RampRange(3f, 2f);
     public RampRange fountains = new RampRange(1f, 2f);
-    public RampRange aiSpeedMin = new RampRange(21f, 25f);
-    public RampRange aiSpeedMax = new RampRange(27f, 31f);
+    public RampRange aiSpeedMin = new RampRange(23.1f, 27.5f);
+    public RampRange aiSpeedMax = new RampRange(29.7f, 34.1f);
 
     [Tooltip("Levels below this number have no loops.")]
     public int loopsFromLevel = 2;

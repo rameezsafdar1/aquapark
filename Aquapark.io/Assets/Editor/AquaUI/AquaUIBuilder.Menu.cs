@@ -66,11 +66,11 @@ public static partial class AquaUIBuilder
         RectTransform home = Container(menu, "Home");
         var screen = home.gameObject.AddComponent<HomeScreen>();
 
-        Unit(home, "vignette_top");
-        Unit(home, "vignette_bottom");
+        StretchX(Unit(home, "vignette_top").rectTransform);
+        StretchX(Unit(home, "vignette_bottom").rectTransform);
         screen.settingsButton = Tappable(Unit(home, "settings_btn"));
         MakeCurrencies(home);
-        Unit(home, "logo");
+        Unit(home, "logo").gameObject.AddComponent<LogoAnimator>();
 
         // Level progress pill
         Gen(home, "lvl_pill", new Frame(70, 212, 250, 48), "LevelPill");
@@ -141,6 +141,7 @@ public static partial class AquaUIBuilder
         SpriteInfo bar = Info("footer_bar");
         RectTransform barRect = NewRect(footer, "Bar", new Frame(-bar.pad, 744f - bar.pad, bar.bw + bar.pad * 2f, bar.bh + bar.pad), null);
         SetImage(barRect, Spr("footer_bar"), false);
+        StretchX(barRect);
         MakeDivider(footer, "Divider1", 75f);
         MakeDivider(footer, "Divider2", 315f);
 

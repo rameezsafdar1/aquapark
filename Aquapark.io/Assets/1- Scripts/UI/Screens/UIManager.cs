@@ -54,7 +54,6 @@ public class UIManager : MonoBehaviour
     {
         Instance = this;
         Time.timeScale = 1f;
-        ApplyAudio();
         SkinManager.Initialise(skinDatabase);
 
         foreach (UIPanel panel in new UIPanel[] { shop, skins, spin, daily, settings, reward, results, pause })
@@ -385,15 +384,10 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    // Sound and music switches are applied by AudioManager.
     private void OnSaveChanged()
     {
-        ApplyAudio();
         RefreshBadges();
-    }
-
-    private static void ApplyAudio()
-    {
-        AudioListener.volume = SaveData.Sound ? 1f : 0f;
     }
 
     #endregion

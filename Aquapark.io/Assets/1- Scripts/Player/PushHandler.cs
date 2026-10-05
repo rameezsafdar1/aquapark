@@ -32,6 +32,10 @@ public class PushHandler : MonoBehaviour
             float forwardDot = Vector3.Dot(forward, toOther);
             float rightDot = Vector3.Dot(right, toOther);
 
+            // Rammed from behind = the player got hit; anything else = the player hit the AI racer.
+            AudioManager.Play(forwardDot < -frontThreshold ? Sfx.GotHit : Sfx.Hit);
+            FollowCamDirector.ShakeBump();
+
             if (forwardDot > frontThreshold)
             {
                 Debug.Log("Enemy is in front");
