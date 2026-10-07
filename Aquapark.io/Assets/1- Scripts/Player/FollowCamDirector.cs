@@ -91,6 +91,20 @@ public class FollowCamDirector : MonoBehaviour
         if (instance != null) instance.AddTrauma(instance.bumpShake);
     }
 
+    /// <summary>
+    /// Stops following the player: the camera stays where it is and keeps looking at the given point (e.g. the ocean
+    /// splash when the player missed the island).
+    /// </summary>
+    public static void StopFollowing(Vector3 lookAtPoint)
+    {
+        if (instance == null) return;
+        var focus = new GameObject("Camera Focus").transform;
+        focus.position = lookAtPoint;
+        instance.cam.Target.TrackingTarget = null;
+        instance.cam.Target.CustomLookAtTarget = true;
+        instance.cam.Target.LookAtTarget = focus;
+    }
+
     private void AddTrauma(float amount)
     {
         trauma = Mathf.Clamp01(trauma + amount);

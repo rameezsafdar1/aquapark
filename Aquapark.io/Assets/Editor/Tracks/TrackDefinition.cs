@@ -2,6 +2,16 @@ using UnityEngine;
 
 public enum LoopDirection { Random, Left, Right, Alternate }
 
+/// <summary>Shapes a loop can take. Every one passes over itself so riders can jump down onto a lower part.</summary>
+public enum LoopShape
+{
+    RoundSpiral,   // circles stacked on top of each other
+    OvalSpiral,    // stretched (racetrack) laps stacked on top of each other
+    SCrossover,    // a weaving S that curls back and crosses under itself
+    FigureEight,   // one circle each way, crossing in the middle
+    SSpiral,       // one and a half laps one way, then one and a half laps the other way
+}
+
 /// <summary>
 /// Every setting needed to generate one level. Create them in bulk from Aquapark > Level Generator,
 /// tweak any of them by hand, then regenerate the prefab.
@@ -57,11 +67,21 @@ public class TrackDefinition : ScriptableObject
     [Range(0f, 1f)] public float loopMaxPercent = 0.92f;
     [Tooltip("Radius of the circle in metres. Smaller = tighter, shorter, harder. One lap is about 2 x pi x radius, so 40 m is about 280 m of track. The tube is ~11 m wide, so keep this above ~30.")]
     [Range(30f, 200f)] public float loopRadius = 45f;
-    [Tooltip("1 = one full circle, 2 = a double spiral.")]
+    [Tooltip("Laps of the round and oval spirals. 1 = one full circle, 2 = a double spiral (laps stacked on top of each other), 3 = a triple spiral.")]
     [Range(1, 3)] public int loopTurns = 1;
+    [Tooltip("Typical straight on each long side of an oval spiral lap, in metres (each oval varies 0.6-1.4x, at least 20 m). The straights of each lap sit right above the lap below, so they are long landing zones.")]
+    [Range(0f, 150f)] public float loopStraight = 0f;
     [Tooltip("Vertical drop from one lap to the next (metres). This is the height of the jump down onto the lower lap. 30 is a good balance between a visible, safe gap and a fall that is not too long.")]
     [Range(15f, 80f)] public float loopGap = 30f;
     public LoopDirection loopDirection = LoopDirection.Alternate;
+    [Tooltip("Each loop picks a shape at random using these weights (0 = never). The same shape never comes twice in a row, and a level gets at most one S-crossover. All 0 = old behaviour (oval when Loop Straight > 0, otherwise round).")]
+    [Min(0f)] public float roundSpiralWeight = 1f;
+    [Min(0f)] public float ovalSpiralWeight = 1f;
+    [Min(0f)] public float sCrossoverWeight = 1f;
+    [Min(0f)] public float figureEightWeight = 0.6f;
+    [Min(0f)] public float sSpiralWeight = 0.8f;
+    [Tooltip("Each loop's radius varies by up to this much (0.15 = +-15%) so loops in one level differ in size.")]
+    [Range(0f, 0.3f)] public float loopSizeVariation = 0.15f;
     [Tooltip("The generator measures the real gap between laps. If it is smaller than this, the loop gap is widened automatically.")]
     [Range(8f, 40f)] public float loopMinClearance = 14f;
 
@@ -86,6 +106,8 @@ public class TrackDefinition : ScriptableObject
     [Header("Fountains (jump pads)")]
     [Range(0, 20)] public int fountainCount = 3;
     [Range(0f, 1f)] public float fountainMinPercent = 0.2f;
+    [Tooltip("No fountain closer to the start than this (metres), whatever the percent range says, so the race never opens on a fountain.")]
+    [Min(0f)] public float fountainMinDistance = 250f;
     [Range(0f, 1f)] public float fountainMaxPercent = 0.7f;
     [Tooltip("Minimum distance between two fountains (metres).")]
     [Min(20f)] public float fountainMinSpacing = 80f;
@@ -95,6 +117,14 @@ public class TrackDefinition : ScriptableObject
     [Range(0f, 0.6f)] public float fountainMaxTurnRate = 0.2f;
     [Tooltip("Leave empty to use the default Water Fountain prefab.")]
     public GameObject fountainPrefab;
+
+    [Header("Rider jump (keep in sync with the Player's Locomotion)")]
+    [Tooltip("Locomotion Glide Speed: forward speed in the air (m/s). Used to check that a fountain on an upper spiral lap lands on the part below.")]
+    [Min(1f)] public float riderGlideSpeed = 45f;
+    [Tooltip("Locomotion Air Gravity: how fast the fall speeds up (m/s per second).")]
+    [Min(1f)] public float riderAirGravity = 35f;
+    [Tooltip("Locomotion Jump Up Force: upward speed at the start of a jump (m/s).")]
+    [Min(0f)] public float riderJumpUp = 20f;
 
     [Header("Race")]
     public float playerSpeed = 27.5f;

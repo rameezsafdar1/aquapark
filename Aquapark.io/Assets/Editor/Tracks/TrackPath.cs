@@ -10,15 +10,24 @@ using UnityEngine;
 /// Positive yaw turns right. Pitch is the downhill angle in degrees (positive = going down).
 ///
 /// Loops are spliced into the track: while a loop is running, the normal wandering of the track is paused, the heading
-/// turns a full 360 degrees per turn and the slope is set so the track drops by LoopGap per lap. When the loop ends,
-/// the track carries on exactly as it would have without it, so loops never change the rest of the layout.
+/// follows the loop's own shape and the slope is set so the track drops by LoopGap between two passes over the same spot.
+/// Every shape ends with the same heading it started with (net turn of 0 or whole circles), so when the loop ends the track
+/// carries on exactly as it would have without it, and loops never change the rest of the layout.
+/// Shapes (see LoopShape): round or oval spirals whose laps stack on top of each other, an S-crossover that weaves back
+/// under itself, an S-spiral (spiral one way, then the other) and a figure-8. A rider who jumps off an upper part lands on a
+/// lower one.
 /// </summary>
 public class TrackPath
 {
     public struct LoopInfo
     {
         public float start, length;   // metres along the finished track
-        public float direction;       // +1 right, -1 left
+        public float direction;       // +1 right, -1 left (S shapes and figure-8 start this way, then swap)
+        public LoopShape shape;
+        public float radius, straight;
+        public int laps;
+        public float overlap;         // track distance between two passes over the same spot; sets the slope
+        public float[] yawTable;      // signed heading change in degrees after u = 0..1 of the loop
     }
 
     public Vector3[] points;
@@ -44,12 +53,15 @@ public class TrackPath
     struct Section { public float center, half, target; }
 
     const float LoopRamp = 0.1f;                 // share of a loop spent easing the turn rate in and out
-    const float LoopSpacing = 60f;               // minimum track between two loops
+    const float LoopSpacing = 220f;              // minimum track between two loops (room for a steep drop or a fountain in between)
+    const float EndRoom = 240f;                  // extra track kept free after the last loop so a steep drop fits before the finish
+    const float SectionLoopMargin = 25f;         // steep drops / flat stretches stay this far from a loop (loops set their own slope)
     const float OverlapDistance = 12f;           // two track parts closer than this horizontally count as overlapping
-    static readonly float[] LoopTable = BuildLoopTable();
-
-    /// <summary>Length of the stretch of track a single loop uses, for the given settings.</summary>
-    public static float LoopStretch(TrackDefinition d) => 2f * Mathf.PI * d.loopRadius * d.loopTurns / (1f - LoopRamp);
+    const float CrossoverSwing = 140f;           // S-crossover: how far the heading swings each way (degrees); >120 makes it cross itself
+    const float SSpiralLink = 40f;               // S-spiral: straight between its two spirals
+    const float SSpiralScale = 0.8f;             // S-spiral radius relative to the loop radius (it is 3 laps long in total)
+    const float MinShapeBend = 30f;              // S-crossover / S-spiral never bend tighter than this radius (the tube pinches below ~25 m)
+    const float MaxLoopsLength = 1800f;          // all loops of a level together; keeps levels to about 3.2 km (~110 s without jumps)
 
     public static TrackPath Generate(TrackDefinition d)
     {
@@ -72,47 +84,50 @@ public class TrackPath
         float L = d.length;
 
         // ---- Loop layout. Make the track longer if the loops do not fit.
-        int loopCount = d.loopCount;
-        float stretch = loopCount > 0 ? LoopStretch(d) : 0f;
+        var loops = PlanLoops(d);
+        float loopsLength = 0f;
+        foreach (var lp in loops) loopsLength += lp.length;
         float lengthBefore = L;
         L = FitLength(d, L);
         int segs = Mathf.Max(8, Mathf.CeilToInt(L / ds));
         L = segs * ds;
 
-        var loops = new List<LoopInfo>();
-        if (loopCount > 0)
+        if (loops.Count > 0)
         {
+            // Spread the spare room randomly over the gaps before, between and after the loops.
             LoopZone(d, L, out float zl, out float zh);
-            float slot = (zh - zl) / loopCount;
-            float lastDir = rng.NextDouble() < 0.5 ? -1f : 1f;
-            for (int i = 0; i < loopCount; i++)
+            float free = Mathf.Max(0f, zh - zl - loopsLength - (loops.Count - 1) * LoopSpacing);
+            var weights = new float[loops.Count + 1];
+            float wSum = 0f;
+            for (int i = 0; i < weights.Length; i++) { weights[i] = Mathf.Lerp(0.2f, 1f, (float)rng.NextDouble()); wSum += weights[i]; }
+            float cursor = zl;
+            for (int i = 0; i < loops.Count; i++)
             {
-                float dir;
-                switch (d.loopDirection)
-                {
-                    case LoopDirection.Left: dir = -1f; break;
-                    case LoopDirection.Right: dir = 1f; break;
-                    case LoopDirection.Alternate: dir = -lastDir; break;
-                    default: dir = rng.NextDouble() < 0.5 ? -1f : 1f; break;
-                }
-                lastDir = dir;
-                float start = zl + slot * i + Mathf.Max(0f, slot - stretch) * Mathf.Lerp(0.15f, 0.85f, (float)rng.NextDouble());
-                loops.Add(new LoopInfo { start = start, length = stretch, direction = dir });
+                cursor += free * weights[i] / wSum + (i > 0 ? LoopSpacing : 0f);
+                var lp = loops[i];
+                lp.start = cursor;
+                loops[i] = lp;
+                cursor += lp.length;
             }
         }
 
         // Track length that is not inside a loop: the normal wandering layout lives in this "base" space.
         float Skipped(float s) { float k = 0f; foreach (var lp in loops) k += Mathf.Clamp(s - lp.start, 0f, lp.length); return k; }
         float ToBase(float s) => s - Skipped(s);
-        float Lb = L - loops.Count * stretch;
+        float Lb = L - loopsLength;
 
         float a = Mathf.Min(d.startStraight, Lb * 0.15f);
         float b = Mathf.Max(a + 150f, Lb - d.finishStraight);
         float[] yawKeys = BuildYawKeys(d, rng, a, b, out float h);
-        List<Section> sections = BuildSections(d, rng, L, Lb, b, ToBase);
+        var loopPoints = new List<float>();   // where each loop sits in base space (a single point there)
+        foreach (var lp in loops) loopPoints.Add(ToBase(lp.start));
+        List<Section> sections = BuildSections(d, rng, L, Lb, b, ToBase, loopPoints);
         float[] noiseKeys = BuildNoiseKeys(d, rng, Lb);
 
-        float loopPitch = Mathf.Asin(Mathf.Clamp(d.loopGap * gapScale / (2f * Mathf.PI * d.loopRadius), 0.02f, 0.5f)) * Mathf.Rad2Deg;
+        // Each loop's slope makes the track drop by the loop gap between two passes over the same spot.
+        var loopPitch = new float[loops.Count];
+        for (int i = 0; i < loops.Count; i++)
+            loopPitch[i] = Mathf.Asin(Mathf.Clamp(d.loopGap * gapScale / loops[i].overlap, 0.02f, 0.5f)) * Mathf.Rad2Deg;
 
         float BaseYaw(float bs)
         {
@@ -128,7 +143,7 @@ public class TrackPath
             foreach (var lp in loops)
             {
                 if (s <= lp.start) continue;
-                yaw += lp.direction * 360f * d.loopTurns * LoopProfile((s - lp.start) / lp.length);
+                yaw += LoopProfile(lp.yawTable, (s - lp.start) / lp.length);
             }
             return yaw;
         }
@@ -154,11 +169,12 @@ public class TrackPath
             p = Mathf.Lerp(p, d.finishPitch, Smooth(Mathf.Clamp01((bs - (b - 200f)) / 200f)));
 
             // Loops fix the slope so each lap drops by the loop gap.
-            foreach (var lp in loops)
+            for (int i = 0; i < loops.Count; i++)
             {
+                var lp = loops[i];
                 float half = lp.length * 0.5f;
                 float w = Smooth(Mathf.Clamp01((half - Mathf.Abs(s - (lp.start + half))) / (half * 0.3f)));
-                p = Mathf.Lerp(p, loopPitch, w);
+                p = Mathf.Lerp(p, loopPitch[i], w);
             }
             return Mathf.Clamp(p, 1f, d.maxPitch);
         }
@@ -212,6 +228,37 @@ public class TrackPath
         return path;
     }
 
+    /// <summary>
+    /// True if a rider launched straight ahead from point i (fountain or edge jump) comes down on a lower part of the track,
+    /// e.g. the next lap of a spiral. Uses the same air movement as Locomotion: up speed jumpUp, then the fall speeds up by
+    /// gravity per second, while moving forward at glideSpeed. The landing spot is worked out for each lower part's own drop.
+    /// </summary>
+    public bool LandsOnLowerTrack(int i, float glideSpeed, float gravity, float jumpUp, float tolerance = 4f, float minDrop = 10f, float maxDrop = 80f)
+    {
+        Vector3 fwd = i < Count - 1 ? points[i + 1] - points[i] : points[i] - points[i - 1];
+        fwd.y = 0f;
+        fwd.Normalize();
+        int skip = Mathf.CeilToInt(60f / spacing);
+        for (int j = i + skip; j < Count - 1; j++)
+        {
+            float drop = points[i].y - points[j].y;
+            if (drop < minDrop || drop > maxDrop) continue;
+            // Time to fall that far: drop = -jumpUp*t + gravity*t^2/2.
+            float t = (jumpUp + Mathf.Sqrt(jumpUp * jumpUp + 2f * gravity * drop)) / gravity;
+            Vector3 land = points[i] + fwd * (glideSpeed * t);
+            if (DistanceXZ(land, points[j], points[j + 1]) <= tolerance) return true;
+        }
+        return false;
+    }
+
+    static float DistanceXZ(Vector3 p, Vector3 a, Vector3 b)
+    {
+        var ab = new Vector2(b.x - a.x, b.z - a.z);
+        var ap = new Vector2(p.x - a.x, p.z - a.z);
+        float k = Mathf.Clamp01(Vector2.Dot(ap, ab) / Mathf.Max(1e-4f, ab.sqrMagnitude));
+        return (ap - ab * k).magnitude;
+    }
+
     /// <summary>Index-space lookup: position along the path for a 0..1 percent.</summary>
     public int IndexAtPercent(float percent) => Mathf.Clamp(Mathf.RoundToInt(percent * (Count - 1)), 0, Count - 1);
 
@@ -244,7 +291,7 @@ public class TrackPath
     static void LoopZone(TrackDefinition d, float L, out float lo, out float hi)
     {
         lo = Mathf.Max(d.startStraight + 100f, L * d.loopMinPercent);
-        hi = Mathf.Min(L * d.loopMaxPercent, L - d.finishStraight - 100f);
+        hi = Mathf.Min(L * d.loopMaxPercent, L - d.finishStraight - 100f - (d.steepSections > 0 ? EndRoom : 0f));
     }
 
     /// <summary>
@@ -254,14 +301,16 @@ public class TrackPath
     public static float FitLength(TrackDefinition d, float requested)
     {
         float L = requested;
-        if (d.loopCount <= 0) return L;
-        float stretch = LoopStretch(d);
-        float need = d.loopCount * stretch + (d.loopCount - 1) * LoopSpacing;
+        var plan = PlanLoops(d);
+        if (plan.Count == 0) return L;
+        float total = 0f;
+        foreach (var lp in plan) total += lp.length;
+        float need = total + (plan.Count - 1) * LoopSpacing;
         float minBase = d.startStraight + d.finishStraight + 150f;   // room left over for the normal layout
-        for (int guard = 0; guard < 400; guard++)
+        for (int guard = 0; guard < 600; guard++)
         {
             LoopZone(d, L, out float zl, out float zh);
-            if (zh - zl >= need && L - d.loopCount * stretch >= minBase) break;
+            if (zh - zl >= need && L - total >= minBase) break;
             L += 10f;
         }
         return L;
@@ -276,28 +325,180 @@ public class TrackPath
 
     static float Smooth(float x) => x * x * (3f - 2f * x);
 
-    // Fraction of a loop's turn completed after u (0..1) of its length: constant turn rate in the middle, eased at both ends.
-    static float[] BuildLoopTable()
+    /// <summary>
+    /// Picks the shape, size and direction of every loop. Uses its own seeded random, so FitLength and Build always agree.
+    /// The same shape never comes twice in a row (when another one is allowed), and a level has at most one S-crossover
+    /// because it is the longest shape.
+    /// </summary>
+    public static List<LoopInfo> PlanLoops(TrackDefinition d)
     {
-        const int n = 256;
-        var table = new float[n + 1];
-        float acc = 0f;
-        for (int i = 1; i <= n; i++)
+        var list = new List<LoopInfo>();
+        if (d.loopCount <= 0) return list;
+        var rng = new System.Random(d.seed * 7349 + 11);
+        float lastDir = rng.NextDouble() < 0.5 ? -1f : 1f;
+        int lastShape = -1;
+        bool usedCrossover = false;
+        float used = 0f;
+        for (int i = 0; i < d.loopCount; i++)
         {
-            float u = i / (float)n;
-            float rate = u < LoopRamp ? Smooth(u / LoopRamp) : u > 1f - LoopRamp ? Smooth((1f - u) / LoopRamp) : 1f;
-            acc += rate / n;
-            table[i] = acc;
+            var w = new[] { d.roundSpiralWeight, d.ovalSpiralWeight, d.sCrossoverWeight, d.figureEightWeight, d.sSpiralWeight };
+            // Shapes that would push the level past the loop length budget are left out, while there is a choice.
+            float radius = d.loopRadius * (1f + ((float)rng.NextDouble() * 2f - 1f) * d.loopSizeVariation);
+            float straight = Mathf.Max(20f, d.loopStraight) * Mathf.Lerp(0.6f, 1.4f, (float)rng.NextDouble());
+            float budget = (MaxLoopsLength - used) / (d.loopCount - i);   // fair share for this loop and the ones after it
+            for (int k = 0; k < w.Length; k++)
+                if (MakeLoop((LoopShape)k, radius, straight, Mathf.Max(1, d.loopTurns), 1f).length > budget * 1.3f) w[k] = 0f;
+            if (usedCrossover) w[(int)LoopShape.SCrossover] = 0f;
+            float others = 0f;
+            for (int k = 0; k < w.Length; k++) if (k != lastShape) others += Mathf.Max(0f, w[k]);
+            if (lastShape >= 0 && others > 0f) w[lastShape] = 0f;
+            float sum = 0f;
+            foreach (float x in w) sum += Mathf.Max(0f, x);
+            LoopShape shape;
+            if (sum <= 0f) shape = d.loopStraight > 0f && d.ovalSpiralWeight > 0f ? LoopShape.OvalSpiral : LoopShape.RoundSpiral;   // nothing fits / all weights off
+            else
+            {
+                float pick = (float)rng.NextDouble() * sum;
+                int k = 0;
+                while (k < w.Length - 1 && (pick -= Mathf.Max(0f, w[k])) > 0f) k++;
+                shape = (LoopShape)k;
+            }
+            lastShape = (int)shape;
+            if (shape == LoopShape.SCrossover) usedCrossover = true;
+
+            float dir;
+            switch (d.loopDirection)
+            {
+                case LoopDirection.Left: dir = -1f; break;
+                case LoopDirection.Right: dir = 1f; break;
+                case LoopDirection.Alternate: dir = -lastDir; break;
+                default: dir = rng.NextDouble() < 0.5 ? -1f : 1f; break;
+            }
+            lastDir = dir;
+
+            var loop = MakeLoop(shape, radius, straight, Mathf.Max(1, d.loopTurns), dir);
+            used += loop.length;
+            list.Add(loop);
         }
-        for (int i = 0; i <= n; i++) table[i] /= acc;
+        return list;
+    }
+
+    static LoopInfo MakeLoop(LoopShape shape, float r, float straight, int laps, float dir)
+    {
+        var lp = new LoopInfo { shape = shape, radius = r, direction = dir, laps = laps };
+        float circle = 2f * Mathf.PI * r;
+        switch (shape)
+        {
+            case LoopShape.RoundSpiral:
+            case LoopShape.OvalSpiral:
+            {
+                // Laps of half circle, straight, half circle, straight (no straights when round), stacked on top of each other.
+                if (shape == LoopShape.RoundSpiral) straight = 0f;
+                float lap = circle + 2f * straight;
+                float arc = Mathf.PI * r / lap;   // share of a lap spent on one half circle
+                lp.straight = straight;
+                lp.length = lap * laps / (1f - LoopRamp);
+                lp.overlap = lap;
+                lp.yawTable = TurnTable(lp.length, new Turn(lp.length, dir * 360f * laps, u =>
+                {
+                    float half = Mathf.Repeat(Mathf.Repeat(u * laps, 1f) * 2f, 1f);   // position inside one "half circle + straight"
+                    return half > 2f * arc ? 0f : 1f;
+                }));
+                break;
+            }
+            case LoopShape.FigureEight:
+            {
+                // A full circle one way, then a full circle the other way: the two circles touch and the track crosses itself.
+                float one = circle / (1f - LoopRamp);
+                lp.laps = 1;
+                lp.length = 2f * one;
+                lp.overlap = circle;
+                lp.yawTable = TurnTable(lp.length, new Turn(one, dir * 360f), new Turn(one, -dir * 360f));
+                break;
+            }
+            case LoopShape.SSpiral:
+            {
+                // One and a half laps one way, a short straight, one and a half laps the other way: a big S with stacked ends.
+                r = Mathf.Max(r * SSpiralScale, MinShapeBend);
+                lp.radius = r;
+                circle = 2f * Mathf.PI * r;
+                float spiral = 1.5f * circle / (1f - LoopRamp);
+                lp.laps = 1;
+                lp.straight = SSpiralLink;
+                lp.length = 2f * spiral + SSpiralLink;
+                lp.overlap = circle;
+                lp.yawTable = TurnTable(lp.length, new Turn(spiral, dir * 540f), new Turn(SSpiralLink, 0f), new Turn(spiral, -dir * 540f));
+                break;
+            }
+            case LoopShape.SCrossover:
+            {
+                // The heading swings past 90 degrees each way (two full waves), so the track curls back and weaves under itself.
+                // The wavelength is chosen so the tightest bend has a radius of 0.8 x the loop radius (at least MinShapeBend).
+                float wave = Mathf.Max(0.8f * r, MinShapeBend) * 2f * Mathf.PI * CrossoverSwing / 57.2958f;
+                lp.laps = 2;
+                lp.length = 2f * wave;
+                lp.overlap = wave * 0.5f;
+                int n = Mathf.Max(64, Mathf.CeilToInt(lp.length));
+                lp.yawTable = new float[n + 1];
+                for (int i = 0; i <= n; i++)
+                {
+                    float u = i / (float)n;
+                    float env = u < 0.2f ? Smooth(u / 0.2f) : u > 0.8f ? Smooth((1f - u) / 0.2f) : 1f;
+                    lp.yawTable[i] = dir * CrossoverSwing * Mathf.Sin(2f * Mathf.PI * 2f * u) * env;
+                }
+                break;
+            }
+        }
+        return lp;
+    }
+
+    struct Turn
+    {
+        public float length, yaw;
+        public Func<float, float> mask;   // 0..1 multiplier on the turn rate along the turn (null = 1); 0 makes a straight
+        public Turn(float length, float yaw, Func<float, float> mask = null) { this.length = length; this.yaw = yaw; this.mask = mask; }
+    }
+
+    // Heading table (degrees, 1 m resolution) for turns placed end to end. Each turn spreads its yaw over its length with a
+    // constant turn rate that is eased in and out at both ends, so turns blend smoothly into each other.
+    static float[] TurnTable(float totalLength, params Turn[] turns)
+    {
+        int n = Mathf.Max(64, Mathf.CeilToInt(totalLength));
+        var table = new float[n + 1];
+        float segStart = 0f, yawBase = 0f;
+        int i0 = 0;
+        for (int t = 0; t < turns.Length; t++)
+        {
+            var turn = turns[t];
+            int i1 = t == turns.Length - 1 ? n : Mathf.Clamp(Mathf.RoundToInt((segStart + turn.length) / totalLength * n), i0, n);
+            var raw = new float[i1 - i0];
+            float sum = 0f;
+            for (int i = i0; i < i1; i++)
+            {
+                float u = Mathf.Clamp01(((i + 0.5f) / n * totalLength - segStart) / turn.length);
+                float rate = u < LoopRamp ? Smooth(u / LoopRamp) : u > 1f - LoopRamp ? Smooth((1f - u) / LoopRamp) : 1f;
+                if (turn.mask != null) rate *= turn.mask(u);
+                raw[i - i0] = rate;
+                sum += rate;
+            }
+            float acc = 0f;
+            for (int i = i0; i < i1; i++)
+            {
+                if (sum > 0f) acc += raw[i - i0] / sum * turn.yaw;
+                table[i + 1] = yawBase + acc;
+            }
+            yawBase += turn.yaw;
+            segStart += turn.length;
+            i0 = i1;
+        }
         return table;
     }
 
-    static float LoopProfile(float u)
+    static float LoopProfile(float[] table, float u)
     {
-        float x = Mathf.Clamp01(u) * (LoopTable.Length - 1);
-        int i = Mathf.Min((int)x, LoopTable.Length - 2);
-        return Mathf.Lerp(LoopTable[i], LoopTable[i + 1], x - i);
+        float x = Mathf.Clamp01(u) * (table.Length - 1);
+        int i = Mathf.Min((int)x, table.Length - 2);
+        return Mathf.Lerp(table[i], table[i + 1], x - i);
     }
 
     // Yaw is a smooth curve through random key angles; start and end keys are 0 so the track begins and finishes straight.
@@ -330,7 +531,7 @@ public class TrackPath
     }
 
     // Steep drops anywhere in the middle; flat stretches preferably inside the fountain range. All in base space.
-    static List<Section> BuildSections(TrackDefinition d, System.Random rng, float L, float Lb, float finishStart, Func<float, float> toBase)
+    static List<Section> BuildSections(TrackDefinition d, System.Random rng, float L, float Lb, float finishStart, Func<float, float> toBase, List<float> loopPoints)
     {
         var list = new List<Section>();
         float lo = Mathf.Max(d.startStraight + 100f, Lb * 0.08f);
@@ -354,6 +555,9 @@ public class TrackPath
                     bool clear = true;
                     foreach (var s in list)
                         if (Mathf.Abs(s.center - c) < s.half + half + 40f) { clear = false; break; }
+                    // A section must not run into a loop: the loop would flatten it to its own slope.
+                    foreach (float lp in loopPoints)
+                        if (Mathf.Abs(lp - c) < half + SectionLoopMargin) { clear = false; break; }
                     if (!clear) continue;
                     list.Add(new Section { center = c, half = half, target = target });
                     break;
@@ -361,11 +565,12 @@ public class TrackPath
             }
         }
 
-        // Fountains need calm ground, so make sure the fountain range holds enough flat stretches for all of them.
+        // Steep drops first (players love them), then flat stretches so fountains have calm ground. Fountains can also sit on
+        // upper loop laps, so flats that no longer fit are not a problem.
+        Place(d.steepSections, d.steepSectionLength * 0.5f, d.steepAngle, lo, hi);
         int flatsInRange = Mathf.Max(d.flatSections, Mathf.CeilToInt(d.fountainCount / 2f));
         float flatHalf = Mathf.Max(d.flatSectionLength, 140f) * 0.5f;
         Place(flatsInRange, flatHalf, 2.5f, flatLo, flatHi);
-        Place(d.steepSections, d.steepSectionLength * 0.5f, d.steepAngle, lo, hi);
         return list;
     }
 }

@@ -31,7 +31,52 @@ public class HomeScreen : MonoBehaviour
         dailyButton.onClick.AddListener(() => UIManager.Instance.OpenDaily());
         spinButton.onClick.AddListener(() => UIManager.Instance.OpenSpin());
         noAdsButton.onClick.AddListener(OnNoAds);
-        missionButton.onClick.AddListener(() => UIManager.Instance.ShowToast("Win 3 races to earn the bonus!"));
+        missionButton.onClick.AddListener(OnMission);
+    }
+
+    // Placeholder until the real mission card (with the packet animation) is connected: tap shows the active mission and its
+    // progress, or claims the reward when the mission is done.
+    private void OnMission()
+    {
+        UIManager ui = UIManager.Instance;
+        if (!MissionManager.HasMissions)
+        {
+            ui.ShowToast("No missions set up");
+            return;
+        }
+
+        if (!MissionManager.RewardPending)
+        {
+            ui.ShowToast(MissionManager.Title + "  " + MissionManager.ProgressText);
+            return;
+        }
+
+        ShowMissionReward();
+    }
+
+    /// <summary>
+    /// Gives the finished mission's reward. Called by UIManager when the menu opens with a reward waiting (e.g. right after
+    /// the first race) and by tapping the card. Placeholder: the imported mission card's packet animation goes here.
+    /// </summary>
+    public void ShowMissionReward()
+    {
+        if (!MissionManager.RewardPending)
+        {
+            return;
+        }
+
+        UIManager ui = UIManager.Instance;
+        MissionGrant grant = MissionManager.ClaimReward();
+        switch (grant.kind)
+        {
+            case MissionRewardKind.Coins: ui.ShowReward(RewardType.Coins, grant.amount, "MISSION COMPLETE"); break;
+            case MissionRewardKind.Gems: ui.ShowReward(RewardType.Gems, grant.amount, "MISSION COMPLETE"); break;
+            case MissionRewardKind.FreeSpins: ui.ShowToast("Mission complete! +" + grant.amount + " free spin" + (grant.amount == 1 ? "" : "s")); break;
+            default:
+                if (grant.skin != null) ui.ShowToast("Mission complete! New skin: " + grant.skin.displayName);
+                else ui.ShowReward(RewardType.Coins, grant.amount, "MISSION COMPLETE");
+                break;
+        }
     }
 
     private void OnEnable()

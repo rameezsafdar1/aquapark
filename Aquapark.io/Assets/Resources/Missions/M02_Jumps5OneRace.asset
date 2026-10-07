@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d188cb28e036d824e9263392633ed2e8, type: 3}
+  m_Name: M02_Jumps5OneRace
+  m_EditorClassIdentifier: Assembly-CSharp::MissionDefinition
+  title: Make {0} jumps in one race
+  type: 4
+  target: 5
+  withinOneRace: 1
+  reward:
+    kind: 0
+    amount: 75
+    skinId: 
+    fallbackCoins: 500

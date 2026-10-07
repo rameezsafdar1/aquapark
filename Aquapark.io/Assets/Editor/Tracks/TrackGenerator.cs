@@ -84,7 +84,9 @@ public static class TrackGenerator
                 capSteps = 4,
             };
             var segmentMesh = TubeProfileBuilder.CreateOrUpdateAsset(SegmentMeshPath(settings), settings);
-            int pieces = Mathf.Max(1, Mathf.RoundToInt(path.Length / d.tubeSegmentLength));
+            // Long tracks get slightly longer tube pieces so the tube stays under the 16-bit mesh vertex limit.
+            float segmentLength = Mathf.Max(d.tubeSegmentLength, path.Length * segmentMesh.vertexCount / (MaxMeshVertices * 0.95f));
+            int pieces = Mathf.Max(1, Mathf.RoundToInt(path.Length / segmentLength));
             int maxPieces = MaxMeshVertices / Mathf.Max(1, segmentMesh.vertexCount);
             if (pieces > maxPieces)
             {
@@ -171,10 +173,10 @@ public static class TrackGenerator
             sb.AppendLine($"  tube {pieces} pieces / {tubeVerts} verts, water {waterVerts} verts");
             if (path.loops.Count > 0)
             {
-                string where = string.Join(", ", path.loops.Select(l => $"{(100f * l.start / path.Length):F0}-{(100f * (l.start + l.length) / path.Length):F0}% ({(l.direction > 0 ? "right" : "left")})"));
-                sb.AppendLine($"  loops {path.loops.Count}: {where}; radius {d.loopRadius:F0} m, gap {path.loopGapUsed:F0} m (measured clearance {path.minClearance:F0} m{(path.gapRetries > 0 ? $", widened {path.gapRetries}x" : "")})");
+                string where = string.Join(", ", path.loops.Select(l => $"{LoopLabel(l)} {(100f * l.start / path.Length):F0}-{(100f * (l.start + l.length) / path.Length):F0}% ({(l.direction > 0 ? "right" : "left")})"));
+                sb.AppendLine($"  loops {path.loops.Count}: {where}; gap {path.loopGapUsed:F0} m (measured clearance {path.minClearance:F0} m{(path.gapRetries > 0 ? $", widened {path.gapRetries}x" : "")})");
             }
-            sb.AppendLine($"  fountains at {string.Join(", ", fountainPoints.Select(i => (100f * i / (path.Count - 1)).ToString("F0") + "%"))}");
+            sb.AppendLine($"  fountains at {string.Join(", ", fountainPoints.Select(i => $"{100f * i / (path.Count - 1):F0}% ({i * path.spacing:F0} m)"))}");
             foreach (var w in warnings) sb.AppendLine("  WARNING: " + w);
             return new Result { ok = prefab != null, prefab = prefab, path = prefabPath, report = sb.ToString() };
         }
@@ -224,12 +226,16 @@ public static class TrackGenerator
         var rng = new System.Random(d.seed * 7919 + 13);
         int minGap = Mathf.CeilToInt(d.fountainMinSpacing / path.spacing);
 
-        // Candidate spots: the fountain range, minus any loops. If loops eat too much of it, use most of the track instead.
+        // Candidate spots: the fountain range, minus loops - except straight-ish bits of an upper spiral lap whose jump lands
+        // on the lap below (a shortcut). If that leaves too little room, use most of the track instead.
+        // Never closer to the start than fountainMinDistance, so the race does not open on a fountain.
+        int firstAllowed = Mathf.CeilToInt(d.fountainMinDistance / path.spacing);
+        bool Usable(int i) => !path.inLoop[i] || (Mathf.Abs(path.turnRate[i]) <= d.fountainMaxTurnRate && path.LandsOnLowerTrack(i, d.riderGlideSpeed, d.riderAirGravity, d.riderJumpUp));
         List<int> Allowed(float from, float to)
         {
             var list = new List<int>();
-            for (int i = path.IndexAtPercent(from); i <= path.IndexAtPercent(to); i++)
-                if (!path.inLoop[i]) list.Add(i);
+            for (int i = Mathf.Max(firstAllowed, path.IndexAtPercent(from)); i <= path.IndexAtPercent(to); i++)
+                if (Usable(i)) list.Add(i);
             return list;
         }
         var allowed = Allowed(d.fountainMinPercent, d.fountainMaxPercent);
@@ -270,6 +276,18 @@ public static class TrackGenerator
         }
         result.Sort();
         return result;
+    }
+
+    static string LoopLabel(TrackPath.LoopInfo l)
+    {
+        switch (l.shape)
+        {
+            case LoopShape.RoundSpiral: return $"round spiral x{l.laps} r{l.radius:F0}";
+            case LoopShape.OvalSpiral: return $"oval spiral x{l.laps} r{l.radius:F0} straights {l.straight:F0}";
+            case LoopShape.SCrossover: return $"S-crossover r{l.radius:F0}";
+            case LoopShape.FigureEight: return $"figure-8 r{l.radius:F0}";
+            default: return $"S-spiral r{l.radius:F0}";
+        }
     }
 
     // Segments are shared between levels that use the same tube shape.

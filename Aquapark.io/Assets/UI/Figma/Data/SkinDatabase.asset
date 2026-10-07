@@ -13,43 +13,83 @@ MonoBehaviour:
   m_Name: SkinDatabase
   m_EditorClassIdentifier: Assembly-CSharp::SkinDatabase
   skins:
+  - id: ghost
+    displayName: Ghost
+    slot: 0
+    icon: {fileID: 21300000, guid: 65201f90246cca74aa67c2c9cec0bc8c, type: 3}
+    modelName: Ghost
+    currency: 0
+    price: 0
+    ownedByDefault: 1
+    unlock: 0
+    unlockLevel: 0
+    rarity: 0
+    cardColor: 1
   - id: penguin
-    displayName: Cool Penguin
-    icon: {fileID: 21300000, guid: ad5fa21e0a5a7124b8ac958f2fcb1843, type: 3}
-    modelPrefab: {fileID: 0}
+    displayName: Penguin
+    slot: 0
+    icon: {fileID: 21300000, guid: 4f4e218d3bca642438f35a82d9009839, type: 3}
+    modelName: penguin guy
     currency: 0
-    price: 0
-    ownedByDefault: 1
-    unlock: 0
-    unlockLevel: 0
-    rarity: 2
-    cardColor: 0
-  - id: pickle
-    displayName: Pickle
-    icon: {fileID: 21300000, guid: e383016504877224385256d40e05162b, type: 3}
-    modelPrefab: {fileID: 0}
-    currency: 0
-    price: 0
-    ownedByDefault: 1
-    unlock: 0
+    price: 200
+    ownedByDefault: 0
+    unlock: 1
     unlockLevel: 0
     rarity: 0
     cardColor: 1
-  - id: bubble
-    displayName: Bubble
-    icon: {fileID: 21300000, guid: cf5cf70955166da4696d2f910e550af7, type: 3}
-    modelPrefab: {fileID: 0}
+  - id: banana
+    displayName: Banana
+    slot: 0
+    icon: {fileID: 21300000, guid: 0e8669ed4fa993a44a17164c9b70bc70, type: 3}
+    modelName: Banana
     currency: 0
-    price: 0
-    ownedByDefault: 1
-    unlock: 0
+    price: 400
+    ownedByDefault: 0
+    unlock: 1
     unlockLevel: 0
     rarity: 0
-    cardColor: 1
-  - id: duck
-    displayName: Duck
-    icon: {fileID: 21300000, guid: c700c911847828f48b8da82211cdd501, type: 3}
-    modelPrefab: {fileID: 0}
+    cardColor: 2
+  - id: hot_dog
+    displayName: Hot Dog
+    slot: 0
+    icon: {fileID: 21300000, guid: 3d1392e0b2a913247aaf2c3d4f1f0484, type: 3}
+    modelName: Hot dog
+    currency: 0
+    price: 750
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 0
+    cardColor: 3
+  - id: sausage
+    displayName: Sausage
+    slot: 0
+    icon: {fileID: 21300000, guid: a9b53397463fb2b4eb1ab2dcaab23da1, type: 3}
+    modelName: Sausage
+    currency: 0
+    price: 750
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 0
+    cardColor: 3
+  - id: french_fries
+    displayName: Fries
+    slot: 0
+    icon: {fileID: 21300000, guid: 2467f72f50050e24eaeb71459658ec71, type: 3}
+    modelName: Frenchfries
+    currency: 0
+    price: 1000
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 0
+    cardColor: 3
+  - id: lego
+    displayName: Lego
+    slot: 0
+    icon: {fileID: 21300000, guid: 53b26208c707cf3478656119172f05d7, type: 3}
+    modelName: Lego
     currency: 0
     price: 1500
     ownedByDefault: 0
@@ -57,10 +97,23 @@ MonoBehaviour:
     unlockLevel: 0
     rarity: 1
     cardColor: 2
-  - id: shark
-    displayName: Shark
-    icon: {fileID: 21300000, guid: 9f1d8c7fd540bee4997ca42e336c0694, type: 3}
-    modelPrefab: {fileID: 0}
+  - id: flower
+    displayName: Flower
+    slot: 0
+    icon: {fileID: 21300000, guid: d009685cebf17d64bae436aa124dfc9c, type: 3}
+    modelName: Flower
+    currency: 0
+    price: 1500
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 1
+    cardColor: 2
+  - id: pink_flower
+    displayName: Pink Flower
+    slot: 0
+    icon: {fileID: 21300000, guid: be8c6e723117f664eba6e4c995b5af55, type: 3}
+    modelName: Pink flower
     currency: 0
     price: 0
     ownedByDefault: 0
@@ -68,10 +121,107 @@ MonoBehaviour:
     unlockLevel: 0
     rarity: 1
     cardColor: 1
-  - id: alien
-    displayName: Alien
-    icon: {fileID: 21300000, guid: 011951a7cdeffcc4e85d7fdded03f126, type: 3}
-    modelPrefab: {fileID: 0}
+  - id: clown
+    displayName: Clown
+    slot: 0
+    icon: {fileID: 21300000, guid: 58b676035a141164087f3e7b5dbe544b, type: 3}
+    modelName: Clown
+    currency: 0
+    price: 0
+    ownedByDefault: 0
+    unlock: 2
+    unlockLevel: 0
+    rarity: 1
+    cardColor: 1
+  - id: lobster
+    displayName: Lobster
+    slot: 0
+    icon: {fileID: 21300000, guid: 7048926d717546c4e8765c387ff79f06, type: 3}
+    modelName: Lobster
+    currency: 0
+    price: 2500
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 1
+    cardColor: 2
+  - id: shark
+    displayName: Shark
+    slot: 0
+    icon: {fileID: 21300000, guid: 1250932165ae7334592650c4d87b56ba, type: 3}
+    modelName: Shark
+    currency: 0
+    price: 0
+    ownedByDefault: 0
+    unlock: 2
+    unlockLevel: 0
+    rarity: 1
+    cardColor: 1
+  - id: hat_eye
+    displayName: Hat Eye
+    slot: 0
+    icon: {fileID: 21300000, guid: be31abb0895c79145976888343f2baef, type: 3}
+    modelName: Hateye
+    currency: 0
+    price: 3000
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 1
+    cardColor: 2
+  - id: battery
+    displayName: Battery
+    slot: 0
+    icon: {fileID: 21300000, guid: e5f2ef51a89953548ad1e46b1d5f755a, type: 3}
+    modelName: Battery hat charc
+    currency: 0
+    price: 3500
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 1
+    cardColor: 2
+  - id: squeeze
+    displayName: Squeeze
+    slot: 0
+    icon: {fileID: 21300000, guid: 02b1ba43b34267b43a4750c5e83e16a1, type: 3}
+    modelName: Squeeze_hat
+    currency: 0
+    price: 0
+    ownedByDefault: 0
+    unlock: 3
+    unlockLevel: 5
+    rarity: 1
+    cardColor: 3
+  - id: multi_eye
+    displayName: Multi Eye
+    slot: 0
+    icon: {fileID: 21300000, guid: 61738a7eaacbf534e9ca093c2a25a0a7, type: 3}
+    modelName: Multi eye
+    currency: 0
+    price: 0
+    ownedByDefault: 0
+    unlock: 3
+    unlockLevel: 8
+    rarity: 2
+    cardColor: 0
+  - id: love_guy
+    displayName: Love Guy
+    slot: 0
+    icon: {fileID: 21300000, guid: fa421cfd9eac69646ba895bfe8bac281, type: 3}
+    modelName: Love guy
+    currency: 1
+    price: 60
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 2
+    cardColor: 0
+  - id: star_glasses
+    displayName: Star Glasses
+    slot: 0
+    icon: {fileID: 21300000, guid: 21689a044476a3e4882b892880a49707, type: 3}
+    modelName: star glasses char
     currency: 1
     price: 80
     ownedByDefault: 0
@@ -79,25 +229,51 @@ MonoBehaviour:
     unlockLevel: 0
     rarity: 2
     cardColor: 0
-  - id: fox
-    displayName: Fox
-    icon: {fileID: 21300000, guid: fc40972a846e0cf44b1b033da130d03e, type: 3}
-    modelPrefab: {fileID: 0}
+  - id: king
+    displayName: King
+    slot: 0
+    icon: {fileID: 21300000, guid: 1fb7d6e168ae7f640b5e068bb9cc82dd, type: 3}
+    modelName: King
     currency: 0
     price: 0
     ownedByDefault: 0
     unlock: 3
     unlockLevel: 12
-    rarity: 1
-    cardColor: 3
-  - id: ghost
-    displayName: Ghost
-    icon: {fileID: 21300000, guid: 8699818e53a243045aa260386a935c77, type: 3}
-    modelPrefab: {fileID: 0}
+    rarity: 2
+    cardColor: 0
+  - id: princess
+    displayName: Princess
+    slot: 0
+    icon: {fileID: 21300000, guid: f24478ace1649054291624e4e677fdc9, type: 3}
+    modelName: Princess
+    currency: 1
+    price: 100
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 2
+    cardColor: 0
+  - id: astronaut
+    displayName: Astronaut
+    slot: 0
+    icon: {fileID: 21300000, guid: 37093e7b0de07fb43a4c6a61128ce126, type: 3}
+    modelName: Astronaut
     currency: 0
     price: 0
     ownedByDefault: 0
     unlock: 3
-    unlockLevel: 12
+    unlockLevel: 15
     rarity: 3
     cardColor: 3
+  - id: ufo
+    displayName: UFO
+    slot: 0
+    icon: {fileID: 21300000, guid: 2b462dd75fcc1b942a26f1ff062e98ef, type: 3}
+    modelName: UFO
+    currency: 1
+    price: 150
+    ownedByDefault: 0
+    unlock: 1
+    unlockLevel: 0
+    rarity: 3
+    cardColor: 0

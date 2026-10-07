@@ -12,6 +12,16 @@ public class PlayerEffects : MonoBehaviour
     [SerializeField] private int currentFloatie;
 
     [SerializeField] private AvatarPass[] Skins;
+    [SerializeField] private AudioSource screamAudio;
+
+    /// <summary>Every character model on the player (one is active). Used by PlayerLoadout.</summary>
+    public AvatarPass[] SkinModels => Skins;
+    /// <summary>Every floatie model the player can ride, same order as each skin's held floaties.</summary>
+    public GameObject[] FloatieModels => Floaties;
+    /// <summary>Index into FloatieModels of the floatie shown when riding.</summary>
+    public int CurrentFloatie { get => currentFloatie; set => currentFloatie = Mathf.Clamp(value, 0, Floaties.Length - 1); }
+    /// <summary>True once the race effects are on (LoadParticles); before that the skins' foot splashes stay hidden.</summary>
+    public bool RaceStarted { get; private set; }
 
     private void Start()
     {
@@ -38,6 +48,7 @@ public class PlayerEffects : MonoBehaviour
         waterWaveParticle.SetActive(false);
         glider.SetActive(true);
         projector.SetActive(true);
+        screamAudio.Play();
     }
 
     public void LandFloatie()
@@ -56,6 +67,7 @@ public class PlayerEffects : MonoBehaviour
 
     public void LoadParticles()
     {
+        RaceStarted = true;
         for (int i = 0; i < Skins.Length; i++)
         {
             if (Skins[i].gameObject.activeSelf)

@@ -1,6 +1,7 @@
 using UnityEngine;
 using Dreamteck.Splines;
 using DG.Tweening;
+using UnityEngine.Serialization;
 
 public class Locomotion : MonoBehaviour
 {
@@ -16,8 +17,12 @@ public class Locomotion : MonoBehaviour
     [SerializeField] private float horizontalSpeed = 5f;
     [SerializeField] private float jumpThreshold = 2.6f;
 
-    [Header("Forward Speed")]
-    [SerializeField] private float airSpeed = 7f;
+    [Header("Air Movement")]
+    [Tooltip("Forward speed while in the air (gliding).")]
+    [SerializeField] private float glideSpeed = 45f;
+    [Tooltip("How fast the fall speeds up while in the air. Was shared with the forward speed (old 'airSpeed'), so the scene value carries over.")]
+    [FormerlySerializedAs("airSpeed")]
+    [SerializeField] private float airGravity = 7f;
 
     [Header("Jump Settings")]
     [SerializeField] private float jumpUpForce = 5f;
@@ -32,6 +37,10 @@ public class Locomotion : MonoBehaviour
     /// <summary>True while the player is off the slide (jumped or fell).</summary>
     public bool IsInAir => inAir;
     private float timeInAir;
+    private Vector3 positionBeforeAirMove;   // where the last air move started (for the landing sweep)
+    private bool launchedByFountain;         // the jump being started comes from a fountain (missions)
+    private double takeoffPercent;           // spline percent where the current jump started (shortcut missions)
+    private Vector3 takeoffPosition;
 
     [Header("Rotation Settings")]
     [Tooltip("Seconds the model takes to slide sideways. Its height and tilt follow the slide surface (SlideSurface).")]
@@ -43,6 +52,34 @@ public class Locomotion : MonoBehaviour
     [SerializeField] private RideBob rideBob = new RideBob();
     [HideInInspector] public float initialSpeed;
     private bool collidedFinish;
+
+    [Header("Getting Knocked Off")]
+    [Tooltip("Seconds after the last steering input (left/right, or holding the screen / mouse) during which the player still counts as steering. Steering players win side bumps; idle ones can be knocked off by AI racers.")]
+    [SerializeField] private float steerGrace = 0.25f;
+    [Tooltip("How far sideways an AI racer throws the player, in the player's local units (the jump-off edge is Jump Threshold).")]
+    [SerializeField] private float knockDistance = 1.2f;
+    [Tooltip("Seconds the sideways throw lasts.")]
+    [SerializeField] private float knockDuration = 0.3f;
+    [Tooltip("Seconds after the race starts during which AI racers cannot knock the player off (the starting grid is tight).")]
+    [SerializeField] private float knockImmunityAtStart = 3f;
+    [Tooltip("Seconds after landing back on the slide during which AI racers cannot knock the player off.")]
+    [SerializeField] private float knockImmunityAfterLanding = 1f;
+    private float raceStartTime = -1f;
+    private float lastLandTime = -999f;
+    private float lastSteerTime = -999f;
+    private float knockSide;
+    private float knockTime = float.MaxValue;
+    private bool knockedOff;   // the jump being started is a knock-off, not a jump (missions)
+
+    /// <summary>True while the player is steering or held the controls a moment ago.</summary>
+    public bool IsSteering => Time.time - lastSteerTime <= steerGrace;
+    /// <summary>True when an AI racer may knock the player off right now (riding, not steering, not just started or landed).</summary>
+    public bool CanBeKnockedOff =>
+        !inAir && !IsDone && !IsSteering && raceStartTime >= 0f &&
+        Time.time - raceStartTime >= knockImmunityAtStart && Time.time - lastLandTime >= knockImmunityAfterLanding;
+
+    /// <summary>True from the end of the race (finish line, pool, ocean...).</summary>
+    public bool IsDone => collidedFinish || GameManager.Instance.gameOver;
 
     #endregion
 
@@ -71,6 +108,16 @@ public class Locomotion : MonoBehaviour
         }
 
 
+        if (raceStartTime < 0f)
+        {
+            raceStartTime = Time.time;
+        }
+
+        if (Mathf.Abs(Input.GetAxisRaw("Horizontal")) > 0.1f || Input.GetMouseButton(0))
+        {
+            lastSteerTime = Time.time;
+        }
+
         if (!inAir)
         {
             HandleSplineMovement();
@@ -83,7 +130,13 @@ public class Locomotion : MonoBehaviour
             {
                 CheckForLanding();
             }
-            HandleAirMovement();
+
+            // Landing can end the race (pool / ocean) and switch the controller off; then there is nothing left to move.
+            if (!GameManager.Instance.gameOver && _controller.enabled)
+            {
+                positionBeforeAirMove = transform.position;
+                HandleAirMovement();
+            }
         }
 
         if (Input.GetKeyDown(KeyCode.Space))
@@ -137,7 +190,21 @@ public class Locomotion : MonoBehaviour
     }
 
     private void JumpOffSpline()
-    {    
+    {
+        // Missions: count the jump (only when leaving the slide, not a fountain hit mid-air) and remember the take-off.
+        if (!inAir)
+        {
+            if (!knockedOff)
+            {
+                RaceStats.Jumped(launchedByFountain);
+            }
+
+            knockedOff = false;
+            takeoffPercent = splineFollower.GetPercent();
+            takeoffPosition = transform.position;
+        }
+        launchedByFountain = false;
+
         splineFollower.follow = false;
         modelTransform.DOLocalRotate(new Vector3(0f, 0f, 0f), rotationSpeed);
         modelTransform.DOLocalMove(new Vector3(0f, 0f, 0f), rotationSpeed);
@@ -148,6 +215,7 @@ public class Locomotion : MonoBehaviour
         transform.rotation = rot;
 
         gravity = jumpUpForce;
+        positionBeforeAirMove = transform.position;
         anim.SetBool("inAir", true);
         AudioManager.Play(Sfx.Jump);
         for (int i = 0; i < _effects.waterTrail.Length; i++)
@@ -159,11 +227,32 @@ public class Locomotion : MonoBehaviour
         _effects.AirFloatie();
     }
 
+    /// <summary>An AI racer rammed the idle player from the side: thrown off the slide towards side (-1 left, +1 right).</summary>
+    public void KnockOff(float side)
+    {
+        if (!CanBeKnockedOff)
+        {
+            return;
+        }
+
+        knockSide = Mathf.Sign(side);
+        knockTime = 0f;
+        knockedOff = true;
+        JumpOffSpline();
+    }
+
     private void HandleAirMovement()
     {
-        gravity -= airSpeed * Time.deltaTime;
+        gravity -= airGravity * Time.deltaTime;
 
-        Vector3 moveDir = transform.forward * airSpeed;
+        Vector3 moveDir = transform.forward * glideSpeed;
+        if (knockTime < knockDuration)
+        {
+            // Knocked off by an AI racer: thrown sideways for a moment, then glides on as usual.
+            moveDir += transform.right * knockSide * (knockDistance * transform.lossyScale.x / knockDuration);
+            knockTime += Time.deltaTime;
+        }
+
         moveDir.y = gravity;
 
         _controller.Move(moveDir * Time.deltaTime);
@@ -185,7 +274,13 @@ public class Locomotion : MonoBehaviour
 
         RaycastHit hit;
 
-        if (Physics.Raycast(ray, out hit, raycastDistance, runLayer))
+        // Cover the whole drop since the last move as well: a fast fall (or a low frame rate) can carry the player past the
+        // top of the pool's trigger box in one frame, and a ray that starts inside the box does not see it - it would hit
+        // the sand under the pool instead.
+        float fell = Mathf.Max(0f, positionBeforeAirMove.y - transform.position.y);
+        Ray sweep = new Ray(transform.position + Vector3.up * fell, Vector3.down);
+
+        if (Physics.Raycast(sweep, out hit, raycastDistance + fell, runLayer))
         {
             if (hit.transform.tag == "Dead")
             {
@@ -193,10 +288,16 @@ public class Locomotion : MonoBehaviour
                 Die();
             }
 
+            else if (hit.transform.tag == "Ocean")
+            {
+                FallIntoOcean(hit);
+            }
+
             else if (hit.transform.tag == "poolWater")
             {
                 if (!GameManager.Instance.gameOver)
                 {
+                    GameManager.Instance.aiManager.PlayerFinished();   // reached the pool: lock the place now
                     GameManager.Instance.gameOver = true;
                     GameManager.Instance.endCam.SetActive(true);
                     PlayDiveIn();
@@ -225,6 +326,8 @@ public class Locomotion : MonoBehaviour
 
         inAir = false;
         gravity = 0;
+        knockTime = float.MaxValue;
+        lastLandTime = Time.time;
         splineFollower.motion.offset = Vector3.zero;
 
         splineFollower.follow = true;
@@ -232,6 +335,13 @@ public class Locomotion : MonoBehaviour
         splineFollower.Project(transform.position, ref sample);
 
         splineFollower.SetPercent(sample.percent);
+
+        // Missions: flight time, and a shortcut when the landing is much further along the track than the jump travelled.
+        RaceStats.AddFlight(timeInAir);
+        float trackLength = GameManager.Instance.CurrentLevel != null ? GameManager.Instance.CurrentLevel.trackLength : 0f;
+        Vector3 flown = transform.position - takeoffPosition;
+        flown.y = 0f;
+        RaceStats.Landed((float)(sample.percent - takeoffPercent) * trackLength, flown.magnitude);
 
         timeInAir = 0;
         _effects.landingEffect.SetActive(true);
@@ -256,6 +366,7 @@ public class Locomotion : MonoBehaviour
         {
             if (!GameManager.Instance.gameOver)
             {
+                GameManager.Instance.aiManager.PlayerFinished();   // crossed the finish line: lock the place now
                 GameManager.Instance.gameOver = true;
                 GameManager.Instance.endCam.SetActive(true);
                 PlayEndSequence();
@@ -274,6 +385,7 @@ public class Locomotion : MonoBehaviour
 
         if (other.CompareTag("Jumper"))
         {
+            launchedByFountain = true;
             JumpOffSpline();
         }
     }
@@ -318,6 +430,7 @@ public class Locomotion : MonoBehaviour
 
     private void PlayDiveIn()
     {
+        RaceStats.AddFlight(timeInAir);   // the jump straight into the pool counts as flight time
         if (!collidedFinish)
         {
             modelTransform.DOLocalRotate(new Vector3(0f, 0f, 0f), rotationSpeed);
@@ -331,8 +444,38 @@ public class Locomotion : MonoBehaviour
         }
     }
 
+    // Missed the island and hit the ocean: splash, sink through the water while the camera stays put, then the fail screen.
+    private void FallIntoOcean(RaycastHit hit)
+    {
+        if (GameManager.Instance.gameOver)
+        {
+            return;
+        }
+
+        GameManager.Instance.gameOver = true;
+        GameManager.Instance.playerFailed = true;
+        RaceStats.AddFlight(timeInAir);
+        splineFollower.follow = false;
+        FollowCamDirector.StopFollowing(hit.point);
+
+        OceanWater ocean = hit.collider.GetComponentInParent<OceanWater>();
+        if (ocean != null)
+        {
+            ocean.Splash(hit.point);
+        }
+        AudioManager.Play(Sfx.Splash);
+        _effects.NoFloatie();
+
+        // Pass through the water instead of standing on its collider.
+        _controller.enabled = false;
+        Vector3 forward = transform.forward;
+        forward.y = 0f;
+        transform.DOMove(hit.point + forward.normalized * 6f + Vector3.down * 12f, 1.2f).SetEase(Ease.InQuad);
+    }
+
     private void Die()
     {
+        RaceStats.AddFlight(timeInAir);
         GameManager.Instance.playerFailed = true;
         splineFollower.follow = false;
         anim.SetBool("Die", true);

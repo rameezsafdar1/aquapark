@@ -82,13 +82,65 @@ public static partial class AquaUIBuilder
         screen.fillMask.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 96f);
         screen.percentText = Fredoka(home, "PercentText", "64%", 15, White, new Frame(278, 227, 34, 18), null, TextAlignmentOptions.MidlineLeft);
 
-        screen.missionButton = Tappable(Unit(home, "mission_card"));
+        BuildMissionCard(home, screen);
 
         // Daily (left) and No Ads (right)
         MenuButton(home, "Daily", "menu_daily_tile", "menu_daily_banner", "menu_daily_badge", 0f, 0f, out screen.dailyButton, out screen.dailyBadge, out TMP_Text _);
         MenuButton(home, "NoAds", "menu_noads_tile", "menu_noads_banner", "menu_daily_badge", 0f, 0f, out screen.noAdsButton, out screen.noAdsBadge, out TMP_Text _, float.NaN, 286f);
         // Spin lives in the footer now (see BuildFooter).
         return screen;
+    }
+
+    private static readonly Color MissionOrange = new Color32(227, 155, 0, 255);
+
+    /// <summary>
+    /// The mission card: the card picture with its text painted out (mission_card_bg), live title, reward icon + amount and a
+    /// progress bar filled in by MissionCardView. Positions match the original Figma card (title, coin, "+50", bar, "1/3").
+    /// </summary>
+    private static void BuildMissionCard(Transform home, HomeScreen screen)
+    {
+        Frame card = UnitFrame("mission_card");
+        RectTransform cardRt = NewRect(home, "MissionCard", card, null);
+        Image cardImage = SetImage(cardRt, Spr("mission_card_bg"), true);
+        screen.missionButton = Tappable(cardImage);
+
+        var view = cardRt.gameObject.AddComponent<MissionCardView>();
+        view.titleText = Lilita(cardRt, "Title", "Finish your first race", 19, Navy, new Frame(120, 596, 94, 24), card, TextAlignmentOptions.MidlineLeft, TextStyle.None, true);
+
+        Image icon = SetImage(NewRect(cardRt, "RewardIcon", new Frame(216, 598, 21, 21), card), Spr("icon_coin"), false);
+        icon.preserveAspect = true;
+        view.rewardIcon = icon;
+        view.rewardText = Lilita(cardRt, "RewardText", "+50", 19, MissionOrange, new Frame(240, 598, 36, 21), card, TextAlignmentOptions.MidlineLeft, TextStyle.None, true);
+
+        Frame bar = new Frame(120, 625, 150, 14);
+        SetImage(NewRect(cardRt, "Track", bar, card), Spr("mission_track"), false);
+        view.fillMask = PlainFill(cardRt, "mission_fill", bar, card, "Fill");
+        view.fillFullWidth = bar.w;
+        view.progressText = Lilita(cardRt, "ProgressText", "0/1", 13, Navy, bar, card, TextAlignmentOptions.Center, TextStyle.None);
+
+        view.coinIcon = Spr("icon_coin");
+        view.gemIcon = Spr("icon_gem");
+        view.spinIcon = Spr("navicon_spin");
+        view.skinIcon = Spr("navicon_skins");
+    }
+
+    /// <summary>Like MakeFill, for a fill picture with no padding inside a parent frame.</summary>
+    private static RectTransform PlainFill(Transform parent, string key, Frame logical, Frame parentFrame, string name)
+    {
+        RectTransform mask = NewRect(parent, name + "Mask", logical, parentFrame);
+        mask.pivot = new Vector2(0f, 0.5f);
+        mask.anchoredPosition = new Vector2(mask.anchoredPosition.x - logical.w * 0.5f, mask.anchoredPosition.y);
+        mask.gameObject.AddComponent<RectMask2D>();
+
+        var fill = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+        fill.gameObject.layer = LayerMask.NameToLayer("UI");
+        fill.SetParent(mask, false);
+        fill.anchorMin = fill.anchorMax = new Vector2(0f, 0.5f);
+        fill.pivot = new Vector2(0f, 0.5f);
+        fill.sizeDelta = new Vector2(logical.w, logical.h);
+        fill.anchoredPosition = Vector2.zero;
+        SetImage(fill, Spr(key), false);
+        return mask;
     }
 
     private static void MenuButton(Transform parent, string name, string tile, string banner, string badge, float dx, float dy,
@@ -234,45 +286,48 @@ public static partial class AquaUIBuilder
         skins.previewArt = SetImage(preview, null, false);
         skins.previewArt.preserveAspect = true;
 
+        // Live 3D model of the selected item, same spot as the picture (which stays as the fallback and the editor view).
+        RectTransform live = NewRect(page, "Preview3D", new Frame(120, 163, 150, 222), null);
+        var liveImage = live.gameObject.AddComponent<RawImage>();
+        liveImage.raycastTarget = false;
+        skins.preview3D = live.gameObject.AddComponent<SkinPreview3D>();
+        skins.preview3D.player = Object.FindFirstObjectByType<PlayerEffects>(FindObjectsInactive.Include);
+        skins.preview3D.idleController = PreviewIdleController();
+
         skins.arrowLeft = Tappable(Unit(page, "skins_arrow_l"));
         skins.arrowRight = Tappable(Unit(page, "skins_arrow_r"));
-        skins.nameText = Lilita(page, "SkinName", "COOL PENGUIN", 26, White, new Frame(80, 402, 172, 30), null, TextAlignmentOptions.MidlineLeft, TextStyle.Outline(3.5f, 3f), true);
+        skins.nameText = Lilita(page, "SkinName", "GHOST", 26, White, new Frame(80, 402, 172, 30), null, TextAlignmentOptions.MidlineLeft, TextStyle.Outline(3.5f, 3f), true);
         skins.epicTag = Unit(page, "skins_tag_epic").gameObject;
 
-        skins.tabs = MakeSegmented(page, "Tabs", new Frame(44, 446, 302, 49), new[] { "CHARACTERS", "HATS", "TRAILS" },
-            new[] { new Frame(50, 452, 130, 37), new Frame(184, 452, 69, 37), new Frame(257, 452, 83, 37) });
+        // Two tabs (trails were dropped): the selector fills half of the bar each.
+        skins.tabs = MakeSegmented(page, "Tabs", new Frame(44, 446, 302, 49), new[] { "CHARACTERS", "FLOATIES" },
+            new[] { new Frame(50, 452, 143, 37), new Frame(197, 452, 143, 37) });
 
-        // Grid
+        // Grid: one scrolling page per tab; SkinsScreen swaps them (and the scroll content) when the tab changes.
         Frame grid = new Frame(12, 494, 366, 196);
         Gen(page, "skin_grid_bg", grid, "GridBg", null, true);
         RectTransform viewport = NewRect(page, "GridViewport", grid, null);
         viewport.gameObject.AddComponent<RectMask2D>();
         var scroll = viewport.gameObject.AddComponent<ScrollRect>();
-        var contentFrame = new Frame(12, 494, 366, 236);
-        var content = new GameObject("Content", typeof(RectTransform)).GetComponent<RectTransform>();
-        content.gameObject.layer = LayerMask.NameToLayer("UI");
-        content.SetParent(viewport, false);
-        content.anchorMin = new Vector2(0f, 1f);
-        content.anchorMax = new Vector2(1f, 1f);
-        content.pivot = new Vector2(0.5f, 1f);
-        content.sizeDelta = new Vector2(0f, contentFrame.h);
-        content.anchoredPosition = Vector2.zero;
-        scroll.content = content;
         scroll.viewport = viewport;
         scroll.horizontal = false;
         scroll.vertical = true;
         scroll.movementType = ScrollRect.MovementType.Elastic;
         scroll.scrollSensitivity = 30f;
 
-        float[] columns = { 23, 111, 199, 287 };
-        float[] rows = { 506, 616 };
-        skins.cards = new SkinCardView[8];
-        string[] colorNames = { "purple", "blue", "green", "yellow" };
-        for (int i = 0; i < 8; i++)
-        {
-            Frame cf = new Frame(columns[i % 4], rows[i / 4], 80, 100);
-            skins.cards[i] = MakeSkinCard(content, "Card" + i, cf, contentFrame, colorNames);
-        }
+        var characters = AssetDatabase.LoadAssetAtPath<SkinDatabase>(DataDir + "/SkinDatabase.asset");
+        var floaties = AssetDatabase.LoadAssetAtPath<SkinDatabase>(DataDir + "/FloatieDatabase.asset");
+        int characterCount = characters != null && characters.skins != null ? characters.skins.Length : 8;
+        int floatieCount = floaties != null && floaties.skins != null ? floaties.skins.Length : 8;
+
+        skins.cards = MakeSkinGrid(viewport, "CharactersContent", characterCount, out RectTransform characterContent);
+        skins.floatieCards = MakeSkinGrid(viewport, "FloatiesContent", floatieCount, out RectTransform floatieContent);
+        floatieContent.gameObject.SetActive(false);
+        scroll.content = characterContent;
+        skins.characterPage = characterContent.gameObject;
+        skins.floatiePage = floatieContent.gameObject;
+        skins.gridScroll = scroll;
+        PreviewFloaties(skins.floatieCards, floaties);
 
         Gen(page, "skin_fade", grid, "GridFade");
         PreviewSkins(skins);
@@ -281,6 +336,69 @@ public static partial class AquaUIBuilder
         skins.actionGraphic = skins.actionButton.targetGraphic;
         skins.actionLabel = Lilita(page, "ActionLabel", "EQUIP", 19, White, NodeFrame("skins_equip_btn"), null, TextAlignmentOptions.Center, TextStyle.Outline(2f, 1.5f), true);
         return skins;
+    }
+
+    /// <summary>A controller with one looping state (Happy Idle) for the shop's 3D character preview.</summary>
+    private static RuntimeAnimatorController PreviewIdleController()
+    {
+        const string path = "Assets/UI/Skins/SkinPreviewIdle.controller";
+        var existing = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(path);
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        AnimationClip idle = null;
+        foreach (Object asset in AssetDatabase.LoadAllAssetsAtPath("Assets/4- Animations/Happy Idle.fbx"))
+        {
+            if (asset is AnimationClip clip && !clip.name.StartsWith("__preview"))
+            {
+                idle = clip;
+            }
+        }
+
+        return UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPathWithClip(path, idle);
+    }
+
+    /// <summary>A scrolling page of skin cards, four per row (design: columns 23/111/199/287, rows 110 apart from 506).</summary>
+    private static SkinCardView[] MakeSkinGrid(RectTransform viewport, string name, int count, out RectTransform content)
+    {
+        int rows = Mathf.Max(2, (count + 3) / 4);
+        var contentFrame = new Frame(12, 494, 366, 12 + rows * 110 + 14);
+        content = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+        content.gameObject.layer = LayerMask.NameToLayer("UI");
+        content.SetParent(viewport, false);
+        content.anchorMin = new Vector2(0f, 1f);
+        content.anchorMax = new Vector2(1f, 1f);
+        content.pivot = new Vector2(0.5f, 1f);
+        content.sizeDelta = new Vector2(0f, contentFrame.h);
+        content.anchoredPosition = Vector2.zero;
+
+        float[] columns = { 23, 111, 199, 287 };
+        string[] colorNames = { "purple", "blue", "green", "yellow" };
+        var cards = new SkinCardView[count];
+        for (int i = 0; i < count; i++)
+        {
+            Frame cf = new Frame(columns[i % 4], 506 + (i / 4) * 110, 80, 100);
+            cards[i] = MakeSkinCard(content, "Card" + i, cf, contentFrame, colorNames);
+        }
+
+        return cards;
+    }
+
+    /// <summary>Fills the hidden floatie page so it looks right when switched on in the editor.</summary>
+    private static void PreviewFloaties(SkinCardView[] cards, SkinDatabase db)
+    {
+        if (db == null || db.skins == null)
+        {
+            return;
+        }
+
+        SkinManager.Initialise(db);
+        for (int i = 0; i < cards.Length && i < db.skins.Length; i++)
+        {
+            cards[i].Bind(db.skins[i], i == 0);
+        }
     }
 
     /// <summary>Fills the cards and the big picture with the first skins so the scene looks right before it runs.</summary>
@@ -301,7 +419,9 @@ public static partial class AquaUIBuilder
         if (db.skins.Length > 0 && db.skins[0].icon != null)
         {
             skins.previewArt.sprite = db.skins[0].icon;
-            skins.previewArt.rectTransform.sizeDelta = new Vector2(db.skins[0].icon.rect.width, db.skins[0].icon.rect.height) / 3f * 2.6f;
+            skins.previewArt.rectTransform.sizeDelta = skins.PreviewSize(db.skins[0].icon);
+            skins.nameText.text = db.skins[0].displayName.ToUpperInvariant();
+            skins.epicTag.SetActive(db.skins[0].rarity >= SkinRarity.Epic);
         }
     }
 
@@ -329,7 +449,9 @@ public static partial class AquaUIBuilder
             view.selectedSprites[c] = Spr("card_" + colorNames[c] + "_sel");
         }
 
-        RectTransform art = NewRect(rt, "Art", new Frame(cf.x + 12, cf.y + 8, 56, 62), cf);
+        // Taller than the Figma placeholder (56 x 62) so the characters read big; feet tuck behind the name / price label,
+        // which is drawn on top.
+        RectTransform art = NewRect(rt, "Art", new Frame(cf.x + 4, cf.y - 1, 72, 90), cf);
         view.art = SetImage(art, null, false);
         view.art.preserveAspect = true;
 

@@ -37,26 +37,33 @@ public class UIManager : MonoBehaviour
     public RaceHud hud;
     public ResultsScreen results;
     public PausePopup pause;
+    [Tooltip("Beach Cup qualifier shown after every won race.")]
+    public QualifierScreen qualifier;
 
     [Header("Data")]
     public SkinDatabase skinDatabase;
+    public SkinDatabase floatieDatabase;
     public Sprite coinSprite;
     public Sprite gemSprite;
 
     private State state = State.Menu;
     private float badgeTimer;
+    private bool qualifierStarted;
 
     public static UIManager Instance { get; private set; }
     public State CurrentState => state;
     public SkinDatabase Skins => skinDatabase;
+    public SkinDatabase Floaties => floatieDatabase;
 
     private void Awake()
     {
         Instance = this;
         Time.timeScale = 1f;
         SkinManager.Initialise(skinDatabase);
+        SkinManager.Initialise(floatieDatabase);
+        SkinManager.Unlocked += OnItemUnlocked;
 
-        foreach (UIPanel panel in new UIPanel[] { shop, skins, spin, daily, settings, reward, results, pause })
+        foreach (UIPanel panel in new UIPanel[] { shop, skins, spin, daily, settings, reward, results, pause, qualifier })
         {
             if (panel != null)
             {
@@ -89,6 +96,8 @@ public class UIManager : MonoBehaviour
             Instance = null;
         }
 
+        SkinManager.Unlocked -= OnItemUnlocked;
+
         if (GameManager.Instance != null)
         {
             GameManager.Instance.RaceSwapped -= OnRaceSwapped;
@@ -104,16 +113,29 @@ public class UIManager : MonoBehaviour
         }
 
         RefreshBadges();
+        EnterMenu();
 
+        // After a restart the scene comes back exactly as on first launch, then Play is pressed for the player,
+        // so the race starts through the same path (lobby, fade, countdown) as a normal click.
         if (StartNextRaceImmediately)
         {
             StartNextRaceImmediately = false;
-            EnterRace();
-            GameManager.Instance.BeginCountdown();
+            ScreenFade.SetBlack();   // hide the menu; the race fades in from black
+            footer.playButton.onClick.Invoke();
         }
-        else
+        else if (MissionManager.RewardPending && homeScreen != null)
         {
-            EnterMenu();
+            // Back on the menu with a finished mission (e.g. right after the first race): give its reward now.
+            StartCoroutine(ShowMissionRewardSoon());
+        }
+    }
+
+    private IEnumerator ShowMissionRewardSoon()
+    {
+        yield return new WaitForSecondsRealtime(0.6f);   // let the menu settle first
+        if (state == State.Menu && MissionManager.RewardPending)
+        {
+            homeScreen.ShowMissionReward();
         }
     }
 
@@ -188,6 +210,12 @@ public class UIManager : MonoBehaviour
         int rank = GameManager.Instance.aiManager.PlayerRank;
         int racers = GameManager.Instance.aiManager.RacerCount;
         float raceTime = GameManager.Instance.RaceTime;
+        RaceStats.EndRace(rank, failed);   // missions count this race
+        if (failed)
+        {
+            QualifierScreen.ResetCup();   // losing a race starts the Beach Cup over
+        }
+
         StartCoroutine(ShowResultsAfter(failed ? 1.6f : 2.8f, rank, racers, failed, raceTime));
     }
 
@@ -197,6 +225,32 @@ public class UIManager : MonoBehaviour
         hud.gameObject.SetActive(false);
         GameManager.Instance.HideRaceTimer();
         results.Present(rank, racers, failed, raceTime);
+    }
+
+    /// <summary>
+    /// Called when the results screen is closed. After a win the Beach Cup qualifier plays its next round first,
+    /// then the game continues the same way it would have without it.
+    /// </summary>
+    public void FinishResults(bool failed)
+    {
+        if (failed || qualifier == null)
+        {
+            ReloadRace(failed);
+            return;
+        }
+
+        if (!qualifierStarted)
+        {
+            qualifierStarted = true;   // both claim buttons end up here; play the round once
+            StartCoroutine(PlayQualifier());
+        }
+    }
+
+    private IEnumerator PlayQualifier()
+    {
+        yield return ScreenFade.Out(0.3f);
+        results.Hide(true);
+        qualifier.Play(() => ReloadRace(false));
     }
 
     #endregion
@@ -349,6 +403,15 @@ public class UIManager : MonoBehaviour
     #endregion
 
     #region Helpers used by the screens
+
+    /// <summary>Level items unlock on their own (the shop announces its own purchases), so tell the player.</summary>
+    private void OnItemUnlocked(SkinData item)
+    {
+        if (item.unlock == SkinUnlock.PlayerLevel)
+        {
+            ShowToast((item.slot == SkinSlot.Floatie ? "New floatie: " : "New character: ") + item.displayName + "!");
+        }
+    }
 
     public void ShowToast(string message)
     {

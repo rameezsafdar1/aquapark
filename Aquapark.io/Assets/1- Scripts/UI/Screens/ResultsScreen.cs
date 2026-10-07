@@ -122,7 +122,7 @@ public class ResultsScreen : UIPanel
         claimButton.onClick.AddListener(() =>
         {
             Collect(1);
-            UIManager.Instance.ReloadRace(failed);
+            UIManager.Instance.FinishResults(failed);
         });
 
         claimTripleButton.onClick.AddListener(() =>
@@ -130,7 +130,7 @@ public class ResultsScreen : UIPanel
             AdService.ShowRewarded(() =>
             {
                 Collect(3);
-                UIManager.Instance.ReloadRace(false);
+                UIManager.Instance.FinishResults(false);
             });
         });
     }

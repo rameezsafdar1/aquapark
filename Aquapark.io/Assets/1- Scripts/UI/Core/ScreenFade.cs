@@ -46,9 +46,22 @@ public class ScreenFade : MonoBehaviour
     /// <summary>Fades the black away.</summary>
     public static IEnumerator In(float seconds) => Get().Run(0f, seconds);
 
+    /// <summary>Makes the screen black at once, with no fade.</summary>
+    public static void SetBlack()
+    {
+        ScreenFade fade = Get();
+        fade.group.alpha = 1f;
+        fade.group.blocksRaycasts = true;
+    }
+
     private IEnumerator Run(float target, float seconds)
     {
         float from = group.alpha;
+        if (Mathf.Approximately(from, target))
+        {
+            yield break;   // already there, e.g. Out() after SetBlack()
+        }
+
         group.blocksRaycasts = true;   // no stray taps while the screen is changing
         for (float t = 0f; t < seconds; t += Time.unscaledDeltaTime)
         {

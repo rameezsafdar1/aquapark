@@ -25,6 +25,8 @@ public class GameManager : MonoBehaviour
     [SerializeField] private Transform levelsRoot;
     [Tooltip("For testing: play this level (index into the array) instead of a random one. -1 = random.")]
     [SerializeField] private int forceLevelIndex = -1;
+    [Tooltip("Scales the player and AI speeds of every level (1.15 = 15% faster). The start boost is added on top unchanged.")]
+    [SerializeField, Range(0.5f, 2f)] private float raceSpeedMultiplier = 1.15f;
 
     /// <summary>The level that is being played, or null when the scene's own level is used.</summary>
     public LevelConfig CurrentLevel { get; private set; }
@@ -131,7 +133,7 @@ public class GameManager : MonoBehaviour
             endCam.transform.SetPositionAndRotation(CurrentLevel.endCamAnchor.position, CurrentLevel.endCamAnchor.rotation);
         }
 
-        aiManager.ApplyLevel(CurrentLevel);
+        aiManager.ApplyLevel(CurrentLevel, raceSpeedMultiplier);
     }
 
     private void SetUpLobby()
@@ -141,8 +143,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // After "Next race" the player skips the menu, so there is no lobby to wait in.
-        if (UIManager.StartNextRaceImmediately || aiManager == null)
+        if (aiManager == null)
         {
             lobby.gameObject.SetActive(false);
             return;

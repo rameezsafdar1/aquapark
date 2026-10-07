@@ -13,19 +13,19 @@ MonoBehaviour:
   m_Name: Level_023
   m_EditorClassIdentifier: Assembly-CSharp-Editor::TrackDefinition
   levelNumber: 23
-  seed: 5323
-  length: 1050
+  seed: 3323
+  length: 2100
   pointSpacing: 12
   startStraight: 40
   finishStraight: 120
-  turnRate: 0.22199912
-  turnChangeLength: 244
-  maxYawDegrees: 52.89379
-  slopeAngle: 11.796514
+  turnRate: 0.2453029
+  turnChangeLength: 248
+  maxYawDegrees: 50.64477
+  slopeAngle: 12.975755
   slopeVariation: 4
   steepSections: 3
-  steepAngle: 34.4131
-  steepSectionLength: 140
+  steepAngle: 34.70749
+  steepSectionLength: 110
   flatSections: 3
   flatSectionLength: 120
   maxPitch: 50
@@ -34,9 +34,16 @@ MonoBehaviour:
   loopMinPercent: 0.1
   loopMaxPercent: 0.92
   loopRadius: 43
-  loopTurns: 1
+  loopTurns: 2
+  loopStraight: 39
   loopGap: 30
   loopDirection: 3
+  roundSpiralWeight: 1
+  ovalSpiralWeight: 1
+  sCrossoverWeight: 1
+  figureEightWeight: 0.6
+  sSpiralWeight: 0.8
+  loopSizeVariation: 0.15
   loopMinClearance: 14
   bankGain: 60
   maxBank: 30
@@ -48,13 +55,17 @@ MonoBehaviour:
   tubeMaterial: {fileID: 0}
   fountainCount: 1
   fountainMinPercent: 0.2
+  fountainMinDistance: 250
   fountainMaxPercent: 0.7
   fountainMinSpacing: 80
   fountainMaxPitch: 14
   fountainMaxTurnRate: 0.2
   fountainPrefab: {fileID: 0}
+  riderGlideSpeed: 45
+  riderAirGravity: 35
+  riderJumpUp: 20
   playerSpeed: 27.5
-  aiSpeedMin: 25.3
-  aiSpeedMax: 31.9
+  aiSpeedMin: 25
+  aiSpeedMax: 31.5
   aiStartSpacing: 15
   startBoostDuration: 5

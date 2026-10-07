@@ -13,18 +13,36 @@ public class AvatarPass : MonoBehaviour
     public string[] targetNames;
 
     private void Awake()
-    {   
-        localAnim = GetComponent<Animator>();
+    {
+        if (Effects != null)
+        {
+            Bind();
+        }
+        else
+        {
+            localAnim = GetComponent<Animator>();
+            anim.avatar = localAnim.avatar;
+            aiEffects.FloatiesInHand = FloatiesInHand;
+            aiEffects.skin = this;
+            aiEffects.SelectFloatie();
+        }
+    }
+
+    /// <summary>
+    /// Makes this the player's body: the shared Animator uses this model's avatar and the effects use its held floaties.
+    /// Awake only runs on the first activation, so PlayerLoadout calls this again whenever it switches skins.
+    /// </summary>
+    public void Bind()
+    {
+        if (localAnim == null)
+        {
+            localAnim = GetComponent<Animator>();
+        }
+
         anim.avatar = localAnim.avatar;
         if (Effects != null)
         {
             Effects.FloatiesInHand = FloatiesInHand;
-        }
-        else
-        {
-            aiEffects.FloatiesInHand = FloatiesInHand;
-            aiEffects.skin = this;
-            aiEffects.SelectFloatie();
         }
     }
 

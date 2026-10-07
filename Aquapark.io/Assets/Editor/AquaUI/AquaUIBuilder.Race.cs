@@ -289,6 +289,7 @@ public static partial class AquaUIBuilder
         ui.settings = BuildSettingsPopup(root);
         ui.reward = BuildRewardPopup(root);
         ui.pause = BuildPausePopup(root);
+        ui.qualifier = BuildQualifier(root);
         ui.toast = BuildToast(root);
 
         if (raceTimer != null)
@@ -310,6 +311,7 @@ public static partial class AquaUIBuilder
         }
 
         ui.skinDatabase = AssetDatabase.LoadAssetAtPath<SkinDatabase>(DataDir + "/SkinDatabase.asset");
+        ui.floatieDatabase = AssetDatabase.LoadAssetAtPath<SkinDatabase>(DataDir + "/FloatieDatabase.asset");
         ui.coinSprite = Spr("icon_coin");
         ui.gemSprite = Spr("icon_gem");
 

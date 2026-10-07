@@ -4,7 +4,12 @@ public class PushHandler : MonoBehaviour
 {
     [SerializeField] private Locomotion mainPlayer;
     [SerializeField] private float frontThreshold, pushValue, boostValue;
+    [Tooltip("Chance (0-1) that an AI racer bumping the player from the side knocks them off the slide, when the player is not steering. A steering player always wins side bumps.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float knockOffChance = 1f;
     private bool boosted;
+    private AiPush lastKnocker;        // the AI racer that last knocked the player off
+    private float lastKnockTime = -999f;
     private float boostTime;
 
     private void Update()
@@ -23,50 +28,60 @@ public class PushHandler : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Agent"))
+        if (!other.CompareTag("Agent"))
         {
-            Vector3 toOther = (other.transform.position - transform.position).normalized;
-            Vector3 forward = transform.forward;
-            Vector3 right = transform.right;
+            return;
+        }
 
-            float forwardDot = Vector3.Dot(forward, toOther);
-            float rightDot = Vector3.Dot(right, toOther);
+        Vector3 toOther = (other.transform.position - transform.position).normalized;
+        float forwardDot = Vector3.Dot(transform.forward, toOther);
+        float rightDot = Vector3.Dot(transform.right, toOther);
+        AiPush push = other.GetComponent<AiPush>();
 
-            // Rammed from behind = the player got hit; anything else = the player hit the AI racer.
-            AudioManager.Play(forwardDot < -frontThreshold ? Sfx.GotHit : Sfx.Hit);
-            FollowCamDirector.ShakeBump();
+        // The racer that just won a bump touches the flying player again a moment later: that is not a new bump.
+        if (push != null && push == lastKnocker && Time.time - lastKnockTime < 1f)
+        {
+            return;
+        }
 
-            if (forwardDot > frontThreshold)
+        FollowCamDirector.ShakeBump();
+
+        if (forwardDot > frontThreshold)
+        {
+            // Rammed an AI racer from behind: it gets shoved ahead.
+            AudioManager.Play(Sfx.Hit);
+            if (push != null)
             {
-                Debug.Log("Enemy is in front");
-                AiPush push = other.GetComponent<AiPush>();
-                if (push != null)
-                {
-                    push.TakePushFromBehind(pushValue);
-                }
+                push.TakePushFromBehind(pushValue);
             }
-            else if (forwardDot < -frontThreshold)
+        }
+        else if (forwardDot < -frontThreshold)
+        {
+            // Rammed from behind: the player gets a speed boost.
+            AudioManager.Play(Sfx.GotHit);
+            Boost();
+        }
+        else
+        {
+            float side = rightDot > 0f ? 1f : -1f;   // which side the AI racer is on
+            bool aiWins = push != null && !push.IsInAir && mainPlayer.CanBeKnockedOff && Random.value < knockOffChance;
+            if (aiWins)
             {
-                //Debug.Log("Enemy is behind");
-                Boost();
-            }
-            else if (rightDot > 0)
-            {
-                AiPush push = other.GetComponent<AiPush>();
-                if (push != null)
-                {
-                    push.Jump(1);
-                }
-                Debug.Log("Enemy is to the right");
+                // The player was not steering: the AI racer wins the side bump and throws the player off, away from it.
+                AudioManager.Play(Sfx.GotHit);
+                lastKnocker = push;
+                lastKnockTime = Time.time;
+                mainPlayer.KnockOff(-side);
             }
             else
             {
-                AiPush push = other.GetComponent<AiPush>();
+                // The player wins: the AI racer is thrown off (counts for the knock-off missions if it falls).
+                AudioManager.Play(Sfx.Hit);
                 if (push != null)
                 {
-                    push.Jump(-1);
+                    push.PushedByPlayer();
+                    push.Jump(side);
                 }
-                Debug.Log("Enemy is to the left");
             }
         }
     }

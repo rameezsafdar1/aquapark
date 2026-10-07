@@ -132,17 +132,27 @@ public class SpinScreen : UIPanel
         Refresh();
 
         int slice = PickPrize();
-        // Slice i sits i * 45 degrees clockwise from the top; turn the wheel clockwise until it is under the pointer.
-        float jitter = Random.Range(-16f, 16f);
-        float turn = 360f * 5f + ((360f - slice * 45f) % 360f) + jitter;
+        // Slice i sits i * 45 degrees clockwise from the top, so it is under the (top) pointer when the wheel's angle is
+        // i * 45 (mod 360). Aim for that absolute angle: the wheel keeps the angle of the previous spin, and turning a fixed
+        // amount from there (as before) stopped it on a different slice from the one that was paid out.
+        float jitter = Random.Range(-16f, 16f);   // stays well inside the 45-degree slice
         float startZ = wheel.localEulerAngles.z;
+        float targetZ = slice * 45f + jitter;
+        float turn = 360f * 5f + Mathf.Repeat(startZ - targetZ, 360f);
 
         wheel.DOKill();
         DOTween.To(() => 0f, v => wheel.localEulerAngles = new Vector3(0f, 0f, startZ - v), turn, 4.2f)
             .SetEase(Ease.OutQuart)
             .SetUpdate(true)
             .SetTarget(wheel)
-            .OnComplete(() => Finish(slice));
+            .OnComplete(() => Finish(SliceUnderPointer()));
+    }
+
+    /// <summary>The slice the pointer is actually on, read from the wheel's final angle (this is what gets paid out).</summary>
+    private int SliceUnderPointer()
+    {
+        float angle = Mathf.Repeat(wheel.localEulerAngles.z, 360f);
+        return Mathf.RoundToInt(angle / 45f) % Prizes.Length;
     }
 
     private static int PickPrize()

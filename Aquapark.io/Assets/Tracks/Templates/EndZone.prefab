@@ -681,7 +681,7 @@ GameObject:
   - component: {fileID: 2324662130352777364}
   m_Layer: 9
   m_Name: NewOcean (2)
-  m_TagString: poolWater
+  m_TagString: Ocean
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -2843,6 +2843,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2744283787878490057}
+  - component: {fileID: 6718471509732187884}
   m_Layer: 0
   m_Name: ocean
   m_TagString: 
@@ -2868,6 +2869,21 @@ Transform:
   - {fileID: 3213329886662832275}
   m_Father: {fileID: 1377746140572429185}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &6718471509732187884
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2973378266403180998}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 251ec68db06177048b138f1d366e476e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::OceanWater
+  splashPrefab: {fileID: 2586947100091486788, guid: bf97aaa7a02fd834782d32dcc497cbef, type: 3}
+  splashScale: 3
+  splashLifetime: 3
 --- !u!1 &3051305566887357398
 GameObject:
   m_ObjectHideFlags: 0
@@ -3527,7 +3543,7 @@ GameObject:
   - component: {fileID: 7081080410552440061}
   m_Layer: 9
   m_Name: NewOcean (3)
-  m_TagString: poolWater
+  m_TagString: Ocean
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0

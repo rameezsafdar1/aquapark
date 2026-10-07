@@ -149,3 +149,437 @@ Every change made in this project is logged here (newest at the bottom).
 - EndZone.prefab: new "BeachProps" group (87 objects): 7 camps around the pool (hut facing the pool, 3 PalmTree_02, 2 potted palms,
   hammock, volleyball net, towels, boards, ball) + 3 tall lookout huts further out. Coconut palms that would grow through huts were removed
   (115 coconut palms remain). Huts ~3.4x, props ~3.2x, to match the 14 m palms.
+
+[2026-10-06] Longer tracks with stacked spirals (more landing spots) + fountains moved away from the start
+- Request: reference video (Downloads/aquapark.mp4) shows much longer slides where a rider who jumps off can land on many lower parts
+  of the track. Make our tracks similar. Also no fountain at the very beginning (race was opening on a fountain).
+- Video notes: track starts high, winds a long way down, lower sections run underneath the upper ones (spirals/switchbacks), and a jump
+  is a long fall onto a later part of the track (shortcut).
+- Measured before: on average only 23% of a track had lower track within jump reach (~30 m sideways, 8-70 m below); level 1 had 0%.
+  Fountains sat 94-130 m from the start in most levels: loops filled the fountain range, so the fallback (8%+) range was used.
+- TrackDefinition: new loopStraight (0-150 m; 0 = round loop, more = stretched oval/racetrack lap) and fountainMinDistance (default 250 m).
+- TrackPath: loops can now be ovals (half circle, straight, half circle, straight); laps stack directly on top of each other, so
+  jumping off an upper lap lands further along the lap below. Loop slope now uses the real lap length. Gap between two loops
+  raised 60 -> 150 m (room for a fountain). New LandsOnLowerTrack(i): does a straight-ahead jump from point i land on lower track?
+- TrackGenerator: fountains are never closer to the start than fountainMinDistance (also in the fallback range). Fountains may now sit
+  on straight bits of an upper spiral lap when the jump lands on the lap below (shortcut, like the video). Report lists fountain metres,
+  laps and straights.
+- TrackBatch / Level Generator window: level time ramp 32-44 s -> 50-65 s; new "Laps per loop" (2 = double spiral), "Loop straights"
+  (25-45 m, about a third of levels keep round loops; 3-spiral levels capped at 15 m) and "Fountain min distance"; loop radius 44->38 m.
+- Regenerated all 50 definitions + prefabs (LevelDatabase lists 50, 0 failed). Results: length 1488-2436 m (avg 2143 m, about 50-85 s
+  without shortcuts, was 912-1236 m); landing coverage avg 44% (was 23%); lap clearance >= 26 m; closest fountain 276 m from start;
+  no fountains skipped (10 minor warnings: fountain on a 15-17 deg slope vs the 14 deg limit). Level 1 still has no loops (as before).
+- Prefabs grew ~280 KB -> ~500 KB each (more spline points); still no meshes stored.
+- Checked with temporary renders (levels 2, 4, 40: overview, spiral close-up, rider view on an upper lap); nothing saved in the scene.
+- Not play-tested yet: jumping from an upper lap onto the lower one in Play mode. Air movement is 7 m/s forward, so a 30 m drop
+  covers ~26 m; if it feels short, raise Locomotion airSpeed or lower the loop gap (TrackBatchSettings.loopGap, 30 m).
+
+[2026-10-06] Loop shape variety: S-crossover, S-spiral, figure-8 + mixed spirals
+- Request: after play-testing (levels good), most loops were round spirals; add S-shaped and other variations so levels stay fresh.
+- Prototyped shapes in Python first (top views + landing coverage): S-crossover (heading swings +-140 deg for two waves, curls back
+  and weaves under itself, ~50% coverage), S-spiral (1.5 laps one way, 40 m straight, 1.5 laps the other way), figure-8 (one circle
+  each way, crossing in the middle, ~33%). A one-wave S-crossover was too tight (25 m bends) and gave little coverage, so it uses two.
+- TrackDefinition: new LoopShape enum and shape weights (round 1, oval 1, S-crossover 1, figure-8 0.6, S-spiral 0.8) +
+  loopSizeVariation (each loop's radius +-15%). loopTurns now = laps of round/oval spirals; loopStraight = typical oval straight
+  (each oval 0.6-1.4x, min 20 m).
+- TrackPath: loops are now planned per loop (TrackPath.PlanLoops, own seeded random): shape picked by weight, never the same shape
+  twice in a row, at most one S-crossover per level, own radius/straight/direction. Each shape has its own heading table (built from
+  eased turns, TurnTable) and its own slope (drop = loop gap between two passes over the same spot). All shapes end on the heading
+  they started with, so the rest of the layout is unchanged. Loops get random spare room between them (150 m minimum gap kept).
+  Limits: all loops of a level <= 2000 m (shapes that would blow it are skipped) so tracks stay under the tube mesh limit;
+  S-crossover / S-spiral never bend tighter than 30 m radius; S-spiral radius is 0.8x the loop radius.
+- TrackGenerator report lists each loop's shape, size and position. TrackBatch / Level Generator window: shape weights + size
+  variation fields; oval straights 25-45 m (3-loop levels capped at 25 m).
+- Regenerated all 50 definitions + prefabs (0 failed). Shapes across the 50 levels: oval spiral 33, round spiral 30, S-spiral 21,
+  figure-8 20, S-crossover 19. Length 1464-2976 m (avg 2343 m); landing coverage avg 39% (figure-8s give less than spirals);
+  lap clearance >= 23 m; tightest bend 30 m; closest fountain 276 m from start; 5 minor fountain slope warnings.
+- Checked with temporary renders of levels 2, 5, 7, 16, 33, 44; nothing saved in the scene.
+- To check in Play mode: S-crossover and figure-8 crossings (jump at a crossing to land on the part below), and loops that end
+  over the island near the pool (track passing above huts/palms).
+
+[2026-10-06] Faster forward glide in the air, same gravity
+- Request: glide forward a bit faster while in the air but keep gravity as it is.
+- Cause: Locomotion.airSpeed was used for both the forward air speed and the fall acceleration (gravity -= airSpeed * dt), so raising
+  it would also make the player fall faster.
+- Locomotion.cs: split into glideSpeed (forward speed in the air, default 45) and airGravity (fall acceleration). airGravity has
+  [FormerlySerializedAs("airSpeed")], so the scene's value (35) carried over without editing gameplay.unity. Glide 35 -> 45 m/s (~30%).
+- Verified in the editor: Player shows glideSpeed 45, airGravity 35, jumpUpForce 20. Compiles. AI (AiMover) unchanged.
+- Note: with the scene values a jump that drops 30 m lasts ~2 s, so the player now travels ~90 m forward (was ~70 m). The generator's
+  fountain-on-spiral check (TrackPath.LandsOnLowerTrack) still assumes ~26 m (it used the script defaults) - see follow-up.
+
+[2026-10-06] Fountain landing check uses the real jump physics
+- Follow-up to the glide change: TrackPath.LandsOnLowerTrack assumed ~26 m of flight (worked out from the script defaults), but with
+  the scene's values a jump carries the rider ~70-90 m, so fountains on spiral laps could overshoot the part below.
+- TrackDefinition: new "Rider jump" fields matching the Player's Locomotion: riderGlideSpeed 45, riderAirGravity 35, riderJumpUp 20
+  (keep in sync if Locomotion is retuned).
+- TrackPath.LandsOnLowerTrack(i, glide, gravity, jumpUp): for every lower part of the track it works out the fall time for that drop
+  (drop = -jumpUp*t + gravity*t^2/2), the landing spot glide*t ahead, and checks it is within 4 m of that part's centre line
+  (distance to the segment, not just to control points). Drops 10-80 m. TrackGenerator passes the definition's rider values.
+- Regenerated all 50 definitions + prefabs (0 failed). 75 fountains; 11 sit on loops and all 11 pass the new landing check
+  (253 valid loop spots exist across the levels). Closest fountain to a start is now 552 m. 11 minor slope warnings (fountain on a
+  slightly steeper slope than 14 deg).
+
+[2026-10-06] Steep drops ("downward streams") in every level
+- Request: a steep downhill stretch in one level was very fun; add them to more levels, a bit more often.
+- Measured: only 12/50 levels had a real drop (>= 22 deg for 24 m+), 13 in total, although levels asked for 1-5. Cause: loops now
+  fill most of the track, flat stretches were placed first and took the gaps, and drops that touched a loop got flattened to the
+  loop's own slope.
+- TrackPath: steep drops are placed before flat stretches and never run into a loop (kept 25 m clear of every loop); gap between loops
+  150 -> 220 m and 240 m kept free after the last loop (when a level has drops) so drops fit between and after loops.
+- Long tracks: TrackGenerator now lengthens tube pieces only when needed to stay under the 16-bit vertex limit (longest level: 3.6 m
+  pieces instead of 3.5 m, 60.8k verts). A lower loop budget (1500 m) was tried first but it cut S-crossovers to 5 and S-spirals to
+  10, so the budget stayed at 1800 m.
+- TrackBatch / window: steep drops per level 1-5 -> 2-4, angle 26-40 -> 30-40 deg, new "Steep drop length" 110 m (was 140 default).
+  FitLength now runs after every batch setting is filled in.
+- Regenerated all 50 definitions + prefabs (0 failed): every level has drops, 132 in total (1-4 per level). Length 1464-3204 m
+  (avg 2647 m, ~90 s without jumps). Shapes: oval 34, round 33, figure-8 24, S-spiral 20, S-crossover 12. Landing coverage avg 33%
+  (more open track between loops). Tightest bend 30 m, lap clearance >= 27 m, closest fountain 552 m from start,
+  21 minor fountain slope warnings (15-17 deg vs 14).
+- Note: in some levels the first drop comes early (~100 m in, during the start boost).
+
+[2026-10-06] Race speed +15% for all levels (one Inspector setting)
+- Request: overall speed feels slow; make every level ~15% faster. Keep the 5 s start boost as it is (and leave the "rammed from
+  behind resets the boost" behaviour alone).
+- Checked first: the Player's SplineFollower speed in the scene is overwritten by AiManager.ApplyLevel with each level prefab's
+  LevelConfig.playerSpeed (27.5 in all 50), so the scene value does nothing; the start boost is AiManager.StartGame (+20 m/s, 5 s,
+  then snaps back) - unchanged.
+- GameManager: new "Race Speed Multiplier" (Levels section, 0.5-2, default 1.15), passed to AiManager.ApplyLevel.
+- AiManager.ApplyLevel(level, speedMultiplier = 1): player speed and the AI min/max speeds are all multiplied, so races stay as close
+  as before. Player 27.5 -> ~31.6 m/s. Start boost (+20) and air glide (45) unchanged. Level prefabs untouched, no regeneration.
+- Compiles; GameManager in the scene shows 1.15 (new field, so the default applies without editing gameplay.unity).
+
+[2026-10-06] Menu lobby: colourful pool-deck tiles + water-park props instead of the wooden deck and beach hut
+- Request: the lobby's wooden deck and hut look like a copy of the reference game; make the deck colourful / water-park like and
+  change the hut-style prop.
+- Deck: new texture Assets/Tracks/Textures/DeckPoolTiles.png (1024px, made in code: aqua/white checker tiles with coral/yellow
+  bands, light bevel per tile; picked from 4 variants). The deck material was renamed DeckWood.mat -> DeckTiles.mat (same GUID, so
+  every reference keeps working) and now uses it (Standard, gloss 0.3). NOTE: the same material is used by the start decks of all 50
+  levels, so they changed too (consistent with the lobby). StartDeck.cs points at the new names for future decks.
+- Props: new Editor/Tracks/LobbyProps.cs builds code-generated props in Assets/Tracks/Props/Poolside: striped umbrellas (12-panel
+  canopy mesh, coral/white and aqua/yellow), sun loungers (aqua and coral cushions, white frame), inflatable ring floats with white
+  stripes (coral, yellow, pink), simple colour materials. "Poolside Props" group added to MenuLobby.prefab on the far deck where the
+  hut stood: umbrella over two loungers facing the pool, stack of 3 rings, a second smaller aqua/yellow umbrella + ring further back,
+  Ball_10 beach ball (scaled to 0.7 m). Menu: Aquapark > Tracks > Add Poolside Props To Lobby. LobbyBuilder adds them on rebuild too.
+- Scene: the lobby's Hut_03 is switched off with a one-line YAML edit in gameplay.unity (m_IsActive 0) instead of saving the scene
+  from Unity (that rewrites Level (1)'s embedded meshes). Scene reloaded; it shows no unsaved changes. Palms and the player's lime
+  float kept.
+- Checked with renders from the lobby camera (before/after) and a close-up of the props.
+
+[2026-10-06] Ocean no longer counts as the finish pool
+- Bug: landing in the ocean showed the win screen. Cause: EndZone.prefab (nested in all 50 levels) had the two big ocean planes
+  (Environment/Island/DefaultSandAndOcean/ocean/NewOcean (2) and NewOcean (3), MeshColliders on the Walkable layer) tagged
+  "poolWater", the same tag Locomotion's landing raycast uses for the finish pool.
+- Fix: those two ocean planes are now tagged "Dead" (same as the sand), so landing in the ocean fails the run like landing on sand.
+  The real pool keeps "poolWater" (Pool (1)/Pool/PoolWaterCollider + the "Pool water" surface).
+- Verified all 50 level prefabs: only the 2 pool objects per level (100 total) carry poolWater; no other poolWater objects. The scene's
+  hand-built Level (1) has no ocean planes, so nothing to change there.
+
+[2026-10-06] Ocean landing: own "Ocean" tag, sink through, camera stops, splash, fail screen
+- Request: give the ocean its own tag; on landing the player should pass through it, the camera stops following, a splash effect
+  plays and the fail screen shows (replaces the earlier quick fix that tagged the ocean "Dead").
+- New tag "Ocean" (TagManager) on EndZone's two ocean planes (NewOcean (2)/(3)), so all 50 levels get it.
+- New Assets/1- Scripts/Levels/OceanWater.cs on the EndZone "ocean" object: spawns the splash (NamuFX Water_Splash_Multiple, scale 3,
+  removed after 3 s).
+- Locomotion: landing raycast hitting "Ocean" calls FallIntoOcean: gameOver + playerFailed, spline follow off, camera stops,
+  splash + splash sound, floatie hidden, CharacterController disabled so the player sinks through the water (DOTween move 12 m down
+  and 6 m forward over 1.2 s). UIManager then shows the normal fail results ("YOU FELL!").
+- FollowCamDirector.StopFollowing(point): clears the Follow Cam's tracking target and aims it at a "Camera Focus" object at the
+  impact point, so the camera stays put and watches the splash.
+- Verified in Play mode (Level_020): race started, player launched 15 m above the ocean away from the island -> gameOver + failed,
+  player 12 m under the surface with the controller off, Follow Cam target none / looking at the focus, splash spawned, results
+  screen active with "YOU FELL!". Sand around the island is still "Dead" (old Die animation); the pool still wins.
+
+[2026-10-06] Race positions: correct place when finishing from the air / after a fall
+- Bug: player was 1st near the finish, jumped sideways straight into the pool and got a lower place.
+- Causes (AiManager.Positioning ranked by spline percent every frame):
+  1. In the air the player's SplineFollower stops, so their percent froze at the take-off point while AI racers kept going and
+     "passed" it; landing in the pool ended the race with that wrong rank.
+  2. An AI racer that crossed the finish line switches to the end spline with SetPercent(0), so finished AIs dropped to last.
+  3. Positions kept updating after the race was over.
+- AiManager: finish order is recorded. AiMover.PlayEndSequence reports AgentFinished (and now runs only once per racer).
+  Locomotion calls PlayerFinished() on the finish line trigger and when landing in the pool: the place is locked to
+  1 + number of AI racers that finished before. Positioning: finished AIs rank ahead of everyone still racing (in finish order);
+  racers in the air (player or a bumped AI) use the closest point of the track under them (never less than their take-off
+  percent); positions freeze once the race is over (fail too). HUD progress markers still get 0..1 values (finished AIs at 1).
+  SetAiDynamically / catch-up boost skip finished AIs (they would have been teleported on the end spline).
+- Locomotion landing check: the pool/ocean/sand raycast now also covers the whole drop since the last air move, so a fast fall or a
+  low frame rate cannot carry the player inside the pool's trigger box unseen (a ray starting inside the box misses it and would
+  hit the "Dead" sand under the pool). Also fixed "CharacterController.Move called on inactive controller" after an ocean
+  landing (no air move once the race has ended or the controller is off).
+- Verified in Play mode: (A) player 9th/12, dropped into the pool with no AI finished -> rank 1, win, "1ST PLACE!";
+  (B) one AI forced across the finish first, then the player into the pool -> rank 2, win. No new console errors.
+
+[2026-10-06] Race start: every AI on the grid, visible two-lane grid, no AI popping in
+- Report: during the countdown AI racers in front are sometimes not visible; client: "some players are being instantiated while
+  already moving forward on the track".
+- Found (checked in Play mode with the countdown slowed to 5%):
+  1. AiManager.InitAi skipped the AI whose slot the player took: it was never placed, stayed off the track during the countdown and
+     snapped onto the track start, already moving, when the race began.
+  2. All AI racers ahead stood in a single file down the middle (random sideways offsets mostly < 0.3), so only 2-3 of them were
+     visible from the camera; the rest were hidden behind the player and each other.
+  3. AI racers knocked off the slide never landed again: they slid along the sand/ocean for the rest of the race. When the player
+     landed, the catch-up teleported them onto the track behind the player while they were still "in the air" -> racers appearing
+     mid-move. (Also made the new in-air ranking count them as ahead.)
+- AiManager.InitAi: new starting grid - AI racers two per row (left/right lane, AiMover.SetStartLane = 0.85 x sideLength), rows
+  startSpacing apart; the player gets a random row of its own and rides the centre (an AI in the player's row was close enough to
+  trigger PushHandler's bump, which snapped it onto the player). Every AI racer gets a slot.
+- AiMover: SetStartLane (Start keeps that lane instead of a random offset), IsInAir, ReturnToTrack(percent).
+- AiManager: ReturnFallenAgents (every 0.5 s while racing): an AI that is off the slide and > 30 m from the track is put back on it at
+  the first spot behind the player the camera cannot see, with the catch-up boost. The landing catch-up (SetAiDynamically) skips AI
+  in the air and now moves racers only to spots outside the camera view (HiddenSpotBehind: 10 m steps; stays put if none).
+  In-air ranking only uses the projected track point when the racer is within 30 m of the track.
+- Verified in Play mode: countdown - all 11 AI on the track, the 5 ahead all in camera view in two lanes, nearest AI 15 m from the
+  player (render checked); a 20 s race - rank matched the AI actually ahead (5th with 4 ahead), no AI stranded off the track,
+  no console errors.
+
+[2026-10-06] Spin wheel pays out the slice the pointer stops on; "Win 3 races" bonus checked
+- Report: after several spins the wheel stopped on one reward but paid another.
+- Cause: SpinScreen.StartSpin turned the wheel by a fixed amount worked out as if it always started at 0 degrees, but the wheel keeps
+  the angle of the previous spin, so from the 2nd spin on it stopped offset by the previous result while the code paid the slice it
+  had picked.
+- Checked first: the pointer is at the top of the wheel, the 8 prize icons sit at 45-degree steps clockwise from the top, and their
+  pictures match the code's Prizes order (100 coins, 5 gems, 500 coins, x2 boost, 20 gems, 250 coins, skin, 100 gems).
+- Fix (SpinScreen.cs): the spin aims for the absolute angle of the picked slice (slice * 45 + jitter of +-16 deg) from wherever the
+  wheel is, and the payout is read from the wheel's final angle (SliceUnderPointer), so the reward always matches what the pointer
+  shows. Simulated 10,000 spins in a row with the angle carried over: old maths 8,757 mismatches, new 0. Compiles.
+- "Win 3 races / +50" card above Play: NOT implemented. It is a single flat image (mission_card.png) with "1/3" and the progress bar
+  baked into the picture; tapping it only shows the toast "Win 3 races to earn the bonus!". No win counting, no progress, no claim.
+  Reported to the user with a proposal; nothing changed yet.
+
+[2026-10-06] Mission (task) system for the card above the Play button
+- Request: a list of 10-20 tasks driven by ScriptableObjects; when one is done the next shows. Examples: win 3 races, throw 5
+  players off, 5 jumps in a game, 30 s of flight. On returning to the menu a packet animation tears open and gives a skin, coins,
+  free spin or gems - that card/animation comes from another project and will be imported later; everything else built now.
+- New Assets/1- Scripts/Missions/:
+  - MissionDefinition (ScriptableObject): title with {0} for the target, MissionType, target, withinOneRace (single race, progress =
+    best race) or cumulative, MissionReward (Coins / Gems / FreeSpins / Skin with optional skin id and fallback coins).
+  - MissionList (ScriptableObject): ordered missions; after the last one it repeats from repeatFromIndex (2) with targets x1.5 per
+    round, so there is always a mission.
+  - RaceStats: per-race counters - jumps, fountain jumps, flight seconds, knock-offs, shortcuts (landing >= 40 m further along the
+    track than the jump travelled, e.g. the next spiral lap); EndRace reports to MissionManager once per race.
+  - MissionManager (static): loads Resources/Missions/MissionList; Title, ProgressText ("1/3"), Progress01, Reward, RewardPending,
+    ClaimReward() (gives the reward, returns a MissionGrant with what was given incl. the skin, moves to the next mission), events
+    Changed / Completed, debug complete/reset. A finished mission waits (nothing counts) until claimed.
+- Mission types: WinRaces, FinishTop3, FinishRaces, PlayRaces, Jumps, FountainJumps, FlightSeconds, KnockOffRacers, Shortcuts.
+- SaveData: missionIndex, missionCycle, missionProgress, missionRewardPending (+ SetMission).
+- Hooks: AiManager.StartGame -> RaceStats.BeginRace; Locomotion counts jumps (fountain flag from the Jumper trigger), flight time on
+  landing and on the final pool/ocean/sand drop, shortcut on landing; PushHandler marks AI racers it shoves sideways
+  (AiPush.PushedByPlayer -> AiMover.MarkPushedByPlayer); AiManager.ReturnFallenAgents counts a knock-off when a racer pushed by the
+  player in the last 8 s falls off the slide; UIManager.BeginResults -> RaceStats.EndRace(rank, failed).
+- Default list (16 missions, Assets/Resources/Missions, built by Aquapark > Missions > Create Default Mission List): finish 2 races,
+  5 jumps in one race, win 3, 3 fountain jumps, throw 3 players off, fly 30 s, top-3 x5, 2 shortcuts, 8 jumps in one race,
+  throw 5 off (skin), win 5, fly 15 s in one race, play 10, 3 shortcuts in one race, throw 3 off in one race, win 10 (skin).
+  Other menu items: Log Current Mission, Complete Current Mission (test), Reset Missions (test).
+- HomeScreen: placeholder until the real card is connected - tapping the card shows the mission + progress as a toast, or claims a
+  pending reward (reward popup for coins/gems, toast for spins/skin). The card picture still has "Win 3 races 1/3" baked in.
+- Verified in Play mode: a race that ended in a fall did not count for "Finish 2 races" (0/2) but counted 1 jump / 5.7 s flight /
+  3 knock-offs; a race finished in the pool -> "Finish 2 races" 1/2; force-complete + ClaimReward gave +50 coins and showed the next
+  mission ("Make 5 jumps in one race 0/5"); reset restored 0/2. Test coins/progress put back afterwards.
+- Note: in the test the start boost knocked 3 AI racers off in the first seconds (two-lane grid), so knock-off missions may be quick.
+
+[2026-10-06] First mission = finish your first race; reward shows on the menu right after it
+- Request: the first mission should simply be completing a race, with the packet animation shown right after the first level.
+- MissionAssets default list: M01 is now "Finish your first race" (FinishRaces, target 1, 50 coins); old M01_Finish2 asset deleted,
+  list rebuilt (16 missions). Counts finished races only: after a fall the game restarts the race straight away without the menu,
+  so the reward appears the first time the player is back on the menu after reaching the pool.
+- UIManager.Start: when the menu opens (not on an auto-restart) with a mission reward pending, HomeScreen.ShowMissionReward() runs
+  after 0.6 s. ShowMissionReward is the single place the imported packet/card animation should go; for now it claims and shows
+  the existing reward popup ("MISSION COMPLETE +50"). Tapping the card still shows progress / claims.
+- Verified in Play mode: race finished in the pool -> "Finish your first race 1/1" pending; back to the menu (ReloadRace(false), as
+  the results screen does) -> reward popup "MISSION COMPLETE +50" appeared by itself, coins +50, next mission
+  "Make 5 jumps in one race 0/5". Test save restored afterwards (mission back to the first one, coins back to 2350).
+
+[2026-10-06] Mission card above Play shows the live mission
+- Report: the card still said "Win 3 races" - it was one flat picture (mission_card.png) with the title, coin, "+50" and "1/3"
+  painted in.
+- New sprites (Assets/UI/Figma/Sprites, same import settings as mission_card): mission_card_bg.png (the card with the painted text,
+  coin and bar removed - border and gradient kept), mission_track.png / mission_fill.png (bar track and pink fill pills, colours
+  sampled from the original card, 150x14 design px).
+- New Assets/1- Scripts/UI/Screens/MissionCardView.cs on the card: title, reward icon + amount (coins/gems icons; spin/skin icons
+  tinted blue/purple because they are white), progress bar + "0/1" text from MissionManager; refreshes on MissionManager.Changed /
+  SaveData.Changed; when the mission is done it shows "CLAIM!" with a full bar and pulses. Long titles shrink, then end in "...".
+- AquaUIBuilder.Menu.cs: BuildMissionCard replaces the flat picture (same frame as the Figma card; title / coin / amount / bar /
+  progress text placed where the original had them); PlainFill helper. UI rebuilt with Aquapark > UI > Rebuild UI In Open Scene and
+  gameplay.unity saved (scene 16.8 -> 23.9 MB vs last commit, mostly Level (1)'s embedded track meshes being rewritten on save).
+- Mission titles shortened so they fit: "Throw {0} players off", "Finish top 3 {0} times", "Fly {0}s in one race",
+  "{0} shortcuts in one race", "Throw {0} off in one race"; mission list rebuilt.
+- Checked with UI renders: first mission ("Finish your first race", coin +50, 0/1), Win 3 races 1/3 (fill at a third), a free-spin
+  mission ready to claim (CLAIM!, full bar), a skin mission 2/5, and the five longest titles. Save restored to the first mission.
+
+[2026-10-06] AI racers invisible during the countdown (again) - real cause found and fixed
+- Report: in the paused editor, during the countdown the AI racers were not visible until the race started (same symptom as the
+  morning fix).
+- Checked the paused game (Level_039): every AI had the right grid percent but its body stood 150-290 m away (e.g. at
+  (250, 62, -45)), only Ai (1) was on its spot; none in camera view. When the race starts the followers move and snap onto the
+  track, so they "appear" at GO.
+- Cause: the AI racers are hidden (SetActive false) in the menu lobby. Their spline is assigned while inactive, and an inactive
+  Dreamteck follower does not rebuild its samples, so SetPercent placed them at that percent of their OLD spline (the scene's
+  hand-built Level (1)). Whether it showed depended on stale data, which is why the morning test passed.
+  Proven live: Ai (10) RebuildImmediate + SetPercent -> moved exactly onto its track point (0.00 m).
+- Fix: AiManager.InitAi calls RebuildImmediate on the player's and every AI racer's follower before SetPercent.
+- Verified in Play mode (countdown slowed to 5%): Level_043 - all 11 AI on their grid spots (worst 0.0 m), all 11 ahead in camera
+  view (render checked); after a scene reload (back from results), Level_029 - all 11 on their spots (worst 0.0 m).
+
+[2026-10-07] Skins shop: real character and floatie icons, Trails tab removed
+- Request: drop the Trails tab, replace the penguin placeholder art with screenshots of the real models under the scene's
+  "Characters Temp" (Models = 22 characters, Floaties = 8 floaties). UI only, no gameplay wiring yet.
+- NEW Editor/AquaUI/SkinIconRenderer.cs (menu Aquapark > UI > Render Skin Icons): copies each model far below the scene on
+  layer 31, poses characters with the "happy Idle" clip, renders a transparent 3/4 view with its own key light, crops and
+  fits to 336x372 (sprites at 6 px/unit = same on-screen size as the old 168x186 art at 3 px/unit, twice as sharp). Scene
+  objects are never modified. Output: Assets/UI/Skins/Characters (22 PNGs), Assets/UI/Skins/Floaties (8 PNGs).
+- AquaUIBuilder.MakeSkinDatabase: placeholder list (penguin, pickle, bubble, ...) replaced by the 22 real characters (Ghost,
+  Penguin, Banana free; the rest coins / gems / ad / level unlocks with placeholder prices) and a NEW FloatieDatabase.asset
+  (8 floaties, Watermelon free). New menu Aquapark > UI > Rebuild Skin Lists.
+- AquaUIBuilder.Menu BuildSkins: tabs are now CHARACTERS / FLOATIES (two equal halves); the grid has one scrolling page per tab
+  (CharactersContent with 22 cards in 6 rows, FloatiesContent with 8 cards, built hidden). Grid rows come from the list length.
+- Small display-only tweaks in SkinsScreen: preview size uses the sprite's pixelsPerUnit instead of a fixed 3; the second tab
+  toasts "Floaties are coming soon" (tab switching to the floatie page is not wired - next step, along with model swapping).
+- Rebuilt the UI in gameplay.unity and saved. Checked renders of both tabs (AquaUIShot); all 30 icons resolve.
+
+[2026-10-07] Skins shop: bigger, aligned character icons; lobster facing; working Floaties tab
+- Request: characters bigger and all at the same position (symmetrical), lobster faced the wrong way, Floaties tab only
+  toasted "coming soon".
+- SkinIconRenderer: characters are now shot straight from the front with ONE orthographic camera relative to each model's
+  root (same scale, same feet line), then all get the same crop (union of visible pixels, symmetric about the centre) in
+  the crop's own tall shape (no wasted side space). Floaties keep per-item fit at 336x372.
+- Lobster: its crayfish costume is rigged 90 deg off from its body (the in-game model has the same issue); the renderer
+  turns that model 90 deg (YawFix table) so the icon faces front. The scene model itself is unchanged.
+- Card art area enlarged from 56x62 to 72x90 (feet tuck behind the name / price label); preview scale 2.6 -> 3.6 with a
+  140 design px width cap (SkinsScreen.PreviewSize) so wide floaties stay clear of the arrows.
+- Floaties tab wired up: SkinData.slot (SkinSlot Character / Floatie), SaveData.EquippedFloatie, SkinManager equips per
+  slot and falls back per slot in Initialise; UIManager.floatieDatabase (initialised on Awake); SkinsScreen.ShowTab swaps
+  the grid page + scroll content, rebinds cards, preview, name, Buy/Equip for the tab. Builder wires floatieCards,
+  characterPage, floatiePage, gridScroll and UIManager.floatieDatabase.
+- Rebuilt UI, saved gameplay.unity. Play mode test: Floaties tab shows 8 floaties, preview/name switch (Watermelon, Lime,
+  Cucumber), Watermelon equips into the floatie slot without touching the equipped character, switching back restores the
+  character page. Floatie model swap in the race is still not wired.
+
+[2026-10-07] Skins & floaties: unlock manager, auto level unlocks, equip applies to the player
+- Request: a manager to choose per skin / floatie whether it unlocks with coins, gems or at a level; when an item is
+  unlocked it is selected and can be equipped.
+- NEW Editor/Skins/SkinManagerWindow.cs - menu Aquapark > Skins & Floaties Manager (and the same table when a
+  SkinDatabase asset is selected): per item icon, name, "Unlocked by" (Free / Coins / Gems / Player level / Rewarded ad),
+  price or level, rarity, card colour, owned at start, reorder / remove / add, details (save id, model name, icon).
+- AquaUIBuilder "Rebuild Skin Lists" now MERGES: existing items keep everything set in the manager (and their order);
+  only icon + model name are refreshed; new defaults are appended. Each item got SkinData.modelName (replaces the unused
+  modelPrefab).
+- SkinManager: registers both lists; Free items are owned from the start; PlayerLevel items unlock by themselves when
+  the level is reached (checked on start and on every SaveData change, re-entry guarded); Grant raises the new Unlocked
+  event; GetEquippedItem(slot). UIManager toasts "New character / floatie: X!" for level unlocks.
+- SkinsScreen: after Buy / ad the item stays selected and the button turns into EQUIP (inspector toggle equipOnUnlock
+  equips straight away instead); Level items show "Reach level N"; Free items unlock on tap.
+- NEW 1- Scripts/Player/PlayerLoadout.cs (added to the Player in gameplay.unity): on Start and on every equip it turns on
+  the matching Player/Character child (AvatarPass, now with a reusable Bind() that sets the shared Animator's avatar and
+  held floaties) and sets PlayerEffects.CurrentFloatie by floatie name. PlayerEffects exposes SkinModels, FloatieModels,
+  CurrentFloatie, RaceStarted (foot splashes stay hidden in the lobby).
+- Verified in Play mode (save backed up and restored): level 7 save auto-owned Squeeze (lv5); Lobster 2,500 coins -> owned,
+  selected, EQUIP -> equipped, Lobster model active with LobsterAvatar; Orange floatie 500 -> EQUIP -> player floatie
+  orange_002, character unchanged; Cucumber (50 gems, had 12) -> refused; level 8 -> Multi Eye unlocked automatically;
+  started a race: Lobster riding/holding the Orange ring.
+
+[2026-10-07] Skins shop: live 3D preview (animated characters, spinning floaties)
+- Request: replace the shop preview images with 3D models; characters play an idle through an Animator, floaties rotate.
+- NEW 1- Scripts/UI/Screens/SkinPreview3D.cs on the Skins page's new "Preview3D" RawImage (150x222 design px, where the
+  picture was): builds a stage at (0,-3000,0) with its own orthographic camera (layer 31 only, removed from every other
+  camera), key light and render texture (3 px per design px, transparent). Copies the selected item from the player's
+  own models (PlayerEffects.SkinModels / FloatieModels) on first use and caches it; copies are made under an inactive
+  parent and stripped of scripts and particles so the player's AvatarPass never runs on them.
+- Characters: fixed frame (-0.2..3.55 m above the feet, measured on all 22 idle poses), so every character has the same
+  scale and feet line, facing the camera; Animator uses NEW Assets/UI/Skins/SkinPreviewIdle.controller (one looping
+  "happy Idle" state, made by the builder), unscaled time, Update(0) on show so there is no T-pose frame. Note: under
+  the Animator the lobster faces front like the others, so no lobster turn is needed here (the earlier icon renders used
+  SampleAnimation, where its suit pointed sideways).
+- Floaties: framed to their own size, viewed 30 deg from above, spin 60 deg/s around their resting orientation.
+- SkinsScreen.preview3D: shown when the item has a model; the old picture stays as fallback (and is what the editor shows
+  outside Play mode). Stage is switched off whenever the Skins page is closed.
+- Builder wires player + idle controller; rebuilt UI, saved gameplay.unity. Verified in Play mode: Penguin, Lobster, King,
+  Sausage, Shark (front, idle, same baseline), Grapefruit spinning; animator time advancing; stage off after closing.
+- Known: the player's watermelon_001 has a missing script component; copying it logs a "referenced script is missing"
+  warning (harmless).
+
+[2026-10-07] Clearing PlayerPrefs did not reset the save (purchased skins etc.)
+- Cause: the project enters Play mode with domain reload OFF (Enter Play Mode Options = 3), so statics live across play
+  sessions. SaveData kept the save loaded in a static field; after clearing PlayerPrefs the old copy stayed in memory and
+  the next change wrote it straight back.
+- Fix: [RuntimeInitializeOnLoadMethod(SubsystemRegistration)] resets run before any Awake each session -
+  SaveData (cached save + Changed listeners), SkinManager (registered lists, SaveData hook, Equipped / Unlocked
+  listeners), MissionManager (Changed / Completed listeners). Every other subscriber re-subscribes in Awake/OnEnable.
+- NEW Editor/SaveDataMenu.cs: Aquapark > Reset Save Data (confirm dialog) wipes the save in memory and PlayerPrefs, also
+  during Play mode.
+- Verified: with 9,999 coins + Lobster held in memory, PlayerPrefs.DeleteAll, then Play -> 300 coins, level 1, Lobster
+  not owned; only the manager's start-owned items (Ghost, Melon) owned. The save key is the only PlayerPrefs key used.
+
+[2026-10-07] AI racers can knock an idle player off the slide
+- Request: like the player throwing AI racers off, AI racers should knock the player off when the player is not
+  actively holding / steering.
+- Locomotion: "steering" = left/right input (arrows, A/D, joystick) or holding the screen / mouse, with a 0.25 s grace
+  (steerGrace). New KnockOff(side): leaves the slide like a jump-off (not counted as a jump for missions) and is thrown
+  sideways knockDistance 1.2 local units (6 m at scale 5; the jump-off edge is ~3 m) over knockDuration 0.3 s, then
+  glides / lands / falls as usual. CanBeKnockedOff = riding, not steering, race not over, not within
+  knockImmunityAtStart (3 s - the starting grid is tight; without it an idle player was thrown off ~1 s in) or
+  knockImmunityAfterLanding (1 s).
+- PushHandler side bumps: AI wins (player thrown away from it, GotHit sound) when the player can be knocked off and the
+  AI is riding, with knockOffChance (inspector, default 1); otherwise the old behaviour (player throws the AI off).
+  Front / behind bumps unchanged. The winning AI is ignored for 1 s so its second contact with the flying player does
+  not throw it off too. AiPush.IsInAir added.
+- Verified in Play mode with an AI placed beside the idle player: inside the start window the AI was thrown off (old
+  behaviour); after it, AI on the right -> player thrown 6.6 m left, AI on the left -> player thrown 6.8 m right and the
+  AI kept riding. Also seen naturally in open racing (idle player knocked off and fell). Save restored.
+
+== 2026-10-07 - Skins shop: auto-equip ==
+- Request: unlocking a skin / floatie equips it immediately; tapping another owned item equips it (no EQUIP press).
+- SkinsScreen: OnUnlocked always equips (equipOnUnlock toggle removed). Select() (cards + arrows) equips the item if
+  it is owned. Button shows EQUIPPED for the selected owned item. Level-reward unlocks (outside the shop) unchanged.
+- Follow-up: no greyed EQUIPPED button. The action button is hidden for owned items (only BUY / WATCH AD / LV n show);
+  selecting an owned item that is not yet equipped shows a "<name> equipped" toast (same toast as "Not enough coins").
+- Fix: the action label (BUY / EQUIP text) stayed on screen when the button hid for owned items. The label is a
+  sibling of skins_equip_btn, not a child, so SkinsScreen.Refresh now hides/shows actionLabel with the button.
+
+== 2026-10-08 - Beach Cup qualifier after won races ==
+- Request: after a successful level, show a qualifier screen (like the aquapark.io "Beach Cup") with 32 game characters
+  on random floaties; each round 5-10 random racers drown (splash VFX + sound), then a 3-5 s pause and the game
+  continues. Drowned racers stay gone next round; after round 3 only one is left. A failed race resets the cup, and it
+  starts over after 3 rounds.
+- NEW 1- Scripts/UI/Screens/QualifierScreen.cs (UIPanel). Builds a 3D stage at runtime (3000,-3000,0), layer 30, own
+  camera (depth 50, drawn over the game, under the overlay canvas), unlit water quad, foam-ring ripples. The racers are
+  copies of the player's own SkinModels / FloatieModels (scripts stripped) playing the "tread water" clip, bobbing out
+  of step. The same seed picks the same 32 racers, names and models every round of a cup. The player sits alone in front
+  with their equipped character and floatie and a green YOU tag; the other racers have name labels that follow the
+  head bone. Long floaties (cucumber, cheese) are not given to other racers. Rows 1,2,3,4,4,5,5,4,4 and the camera is
+  fitted automatically to the screen.
+- Rounds: rounds 1-2 drown drownPerRound (5-10) racers, round 3 drowns everyone except the player (31 have to go in 3
+  rounds, so 5-10 every round cannot end with one left). Drowning = wobble, Water_Splash_Multiple splash, Sfx.Splash,
+  sometimes a scream (ahh / oaaaen / funny scream), sink. Then QUALIFIED! (or CHAMPION! after round 3), the round pip
+  fills, the finish chime plays, and after 3-5 s the game continues.
+- SaveData: cupRound / cupSeed / cupOut (+ SetCup / ResetCup), so the cup survives scene reloads and app restarts. The
+  round is saved before it plays.
+- Flow: ResultsScreen claim buttons -> UIManager.FinishResults(failed). Win -> fade to black, hide results, qualifier
+  round, then ReloadRace(false) as before. Fail -> straight reload as before. UIManager.BeginResults resets the cup
+  when the race was failed. "Success" = finished without falling, at any place.
+- NEW Editor/AquaUI/AquaUIBuilder.Qualifier.cs: builds the panel (res_ribbon banner "BEACH CUP", ROUND n/3, 3
+  white_pill pips, name template, YOU tag, result text) and makes the assets in Assets/UI/Qualifier
+  (QualifierFloat.controller with Treading Water; QualifierWater.mat Unlit/Color; QualifierRipple.mat legacy particle
+  alpha-blended with FoamRing.png - the project uses the built-in pipeline, not URP). Part of Rebuild UI, and also
+  Aquapark > UI > Add Qualifier To Open Scene to add just this panel. Added to gameplay.unity and saved.
+- Verified in Play mode: round 1 (9 drowned), round 2 via FinishResults (the 9 stayed gone, 7 more drowned), round 3
+  (only the player left, CHAMPION!), ResetCup sets everything back to 0. No new console errors.
+
+== 2026-10-08 - Beach Cup qualifier: text and round bars ==
+- Request: the outline/shadow on BEACH CUP, QUALIFIED! and CHAMPION! was too heavy (letters merged); the 3 round bars
+  looked skewed (fully rounded pill squashed to a thin bar) - only the corners should be a little rounded.
+- AquaUIBuilder.Qualifier: title outline 5 -> 2.2 (shadow 2.5, size 36), result outline 6 -> 3 (shadow 3.5); both get
+  letter spacing (4 / 5).
+- Round bars: new generated sprite Assets/UI/Qualifier/rounded_rect.png (white, 4 design px corners, 9-sliced, ppu 3,
+  made by QualifierRoundedSprite). Each bar = navy frame 46x16 + tinted fill inset 2 px (QualifierScreen.roundPips now
+  point at the fills). Panel rebuilt with Add Qualifier To Open Scene and the scene saved.
+- Verified in Play mode with screenshots (round 3 / CHAMPION!).
+
+== 2026-10-08 - Qualifier: YOU tag height setting ==
+- QualifierScreen.youTagOffset (Inspector, default 22, was a fixed 6): how far the YOU tag sits above the player.
+  Only the script changed; the user's own font edits on the Qualifier panel in the scene were left untouched (no
+  rebuild).
+
+== 2026-10-08 - Race start: player never in the top 3 ==
+- AiManager.InitAi: the player's starting row is now picked from 0..(AI count - 3) / 2 instead of any row, so at least
+  3 AI racers always start ahead of them (player starts 4th or worse when the countdown begins). New const MinAiAhead = 3.
+  With fewer than 3 AI the player simply starts last.

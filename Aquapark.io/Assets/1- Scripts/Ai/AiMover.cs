@@ -27,6 +27,7 @@ public class AiMover : MonoBehaviour
     private float horizontalValue, horizontalTime;
     private Vector3 moveDir;
     private bool collidedFinish;
+    private bool hasStartLane;   // placed in a grid lane by AiManager, so Start keeps that sideways position
     [SerializeField] private GameObject[] skins;
 
 
@@ -41,9 +42,24 @@ public class AiMover : MonoBehaviour
 
     private void Start()
     {
-        moveDis = Random.Range(-sideLength, sideLength);
-        characterModel.DOLocalMoveX(moveDis, 0f);
+        if (!hasStartLane)
+        {
+            moveDis = Random.Range(-sideLength, sideLength);
+            characterModel.DOLocalMoveX(moveDis, 0f);
+        }
         delay = Random.Range(minimumDelay, maximumDelay);
+    }
+
+    /// <summary>Puts the racer in the left (-1) or right (+1) lane of the starting grid, clear of the centre.</summary>
+    public void SetStartLane(float side)
+    {
+        hasStartLane = true;
+        moveDis = Mathf.Sign(side) * sideLength * 0.85f;
+        characterModel.DOKill();
+        Vector3 p = characterModel.localPosition;
+        characterModel.localPosition = new Vector3(moveDis, p.y, p.z);
+        delay = Random.Range(minimumDelay, maximumDelay);
+        timePassed = 0f;
     }
 
     // The racer floats with its ring at the waterline and tilts with the slide; the sideways tweens only move it along X.
@@ -202,8 +218,14 @@ public class AiMover : MonoBehaviour
 
     private void PlayEndSequence()
     {
+        if (collidedFinish)
+        {
+            return;
+        }
+
         collidedFinish = true;
         SplineFollower splineFollower = GetComponent<SplineFollower>();
+        GameManager.Instance.aiManager.AgentFinished(splineFollower);
         splineFollower.followSpeed = 10;
         splineFollower.spline = GameManager.Instance.endSpline;
         // Spread the racers across the pool so they do not stack. The dive path ends 8 m from the far wall with
@@ -217,6 +239,31 @@ public class AiMover : MonoBehaviour
         splineFollower.SetPercent(0);
         anim.SetBool("Dive", true);
         Effects.NoFloatie();
+    }
+
+    private float lastPlayerPushTime = -999f;
+
+    public void MarkPushedByPlayer() => lastPlayerPushTime = Time.time;
+
+    /// <summary>True if the player shoved this racer within the last few seconds.</summary>
+    public bool PushedByPlayerWithin(float seconds) => Time.time - lastPlayerPushTime <= seconds;
+
+    /// <summary>True while the racer is off the slide (pushed off or jumping).</summary>
+    public bool IsInAir => inAir;
+
+    /// <summary>Puts a racer that fell off the slide back on it at the given percent, riding normally again.</summary>
+    public void ReturnToTrack(double percent)
+    {
+        inAir = false;
+        gravity = 0;
+        timeInAir = 0;
+        horizontalTime = 1f;
+        characterModel.DOKill();
+        characterModel.localRotation = Quaternion.identity;
+        follower.SetPercent(percent);
+        follower.follow = true;
+        anim.SetBool("inAir", false);
+        Effects.LandFloatie();
     }
 
     public void Jump(float value)

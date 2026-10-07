@@ -14,6 +14,11 @@ public class AiManager : MonoBehaviour
     [Tooltip("The old floating rank text above the player. The HUD shows the rank now, so it is off by default.")]
     [SerializeField] private bool showWorldRankLabel;
     private List<double> distances = new List<double>();
+    private readonly List<SplineFollower> finishedAgents = new List<SplineFollower>();   // AI racers in finish order
+    private bool playerRankLocked;
+    private float rescueTimer;
+    private const int MinAiAhead = 3;               // AI racers that always start ahead of the player (player starts 4th or worse)
+    private const float OffTrackDistance = 30f;   // metres from the track centre line: further than this = knocked off the slide
     private float startPercent, boostDuration, initialSpeed;
     private bool playerBoostTime;
     private bool inLobby;
@@ -77,6 +82,7 @@ public class AiManager : MonoBehaviour
     {
         Positioning();
         UpdateCatchUp();
+        ReturnFallenAgents();
         if (playerBoostTime)
         {
             boostDuration += Time.deltaTime;
@@ -92,11 +98,12 @@ public class AiManager : MonoBehaviour
     /// <summary>
     /// Puts the player and every AI racer on a level's spline and applies that level's race settings.
     /// Must run before Start() places the racers, so GameManager (which calls this) runs first.
+    /// speedMultiplier scales the player and AI speeds together, so races stay just as close.
     /// </summary>
-    public void ApplyLevel(LevelConfig level)
+    public void ApplyLevel(LevelConfig level, float speedMultiplier = 1f)
     {
-        minSpeed = level.aiSpeedMin;
-        maxSpeed = level.aiSpeedMax;
+        minSpeed = level.aiSpeedMin * speedMultiplier;
+        maxSpeed = level.aiSpeedMax * speedMultiplier;
         startSpacing = level.aiStartSpacingPercent;
         startBoostDuration = level.startBoostDuration;
 
@@ -111,7 +118,7 @@ public class AiManager : MonoBehaviour
         raceSpline = level.mainSpline;
         raceLength = level.trackLength > 1f ? level.trackLength : level.mainSpline.CalculateLength();
         Player.splineFollower.spline = level.mainSpline;
-        Player.splineFollower.followSpeed = level.playerSpeed;
+        Player.splineFollower.followSpeed = level.playerSpeed * speedMultiplier;
     }
 
     /// <summary>Parks the player on the menu lobby tube and hides the AI until the race starts.</summary>
@@ -151,27 +158,44 @@ public class AiManager : MonoBehaviour
         InitAi();
     }
 
+    /// <summary>
+    /// Starting grid: AI racers two per row (left and right lane), rows startSpacing apart; the player gets a random row of
+    /// their own and rides its centre. The AI racers ahead are visible beside the player instead of hidden in a single file,
+    /// and nobody starts close enough to the player to set off a bump.
+    /// Every AI racer gets a slot (the old loop skipped the one whose slot the player took, so it was never put on the track
+    /// and popped onto it, already moving, when the race started).
+    /// </summary>
     public void InitAi()
     {
-        int playerPos = Random.Range(0, allAgents.Length);
+        // The player never starts in the top 3: AI racers on rows >= playerRow start ahead of them (allAgents.Length -
+        // 2 * playerRow racers), so keep at least MinAiAhead of them in front. With too few AI the player starts last.
+        int maxPlayerRow = Mathf.Max(0, (allAgents.Length - MinAiAhead) / 2);
+        int playerRow = Random.Range(0, maxPlayerRow + 1);
+        // A follower that was inactive when its spline was assigned (the AI racers are hidden in the lobby) still holds the
+        // samples of its old spline, so SetPercent would put it at that percent of the OLD track - far off-screen until the
+        // race starts and it snaps over. Rebuild first so every racer stands on the real track during the countdown.
+        Player.splineFollower.RebuildImmediate();
+        Player.splineFollower.SetPercent(startPercent + startSpacing * (playerRow + 1));
 
         for (int i = 0; i < allAgents.Length; i++)
         {
-            startPercent += startSpacing;
-            if (i == playerPos)
+            int row = i / 2;
+            if (row >= playerRow)
             {
-                //allAgents[i].SetPercent(Player.GetPercent() + 0.003f);
-                Player.splineFollower.SetPercent(startPercent);
-            }
-            else
-            {
-                allAgents[i].SetPercent(startPercent);
+                row++;   // skip the player's row
             }
 
-            Debug.Log("Init called");
-            Animator anim = allAgents[i].GetComponent<Animator>();
-            anim.SetBool("Start", true);
-            allAgents[i].GetComponent<AiEffects>().StartRaceEffects();
+            SplineFollower racer = allAgents[i];
+            racer.RebuildImmediate();
+            racer.SetPercent(startPercent + startSpacing * (row + 1));
+            AiMover mover = racer.GetComponent<AiMover>();
+            if (mover != null)
+            {
+                mover.SetStartLane(i % 2 == 0 ? -1f : 1f);
+            }
+
+            racer.GetComponent<Animator>().SetBool("Start", true);
+            racer.GetComponent<AiEffects>().StartRaceEffects();
         }
     }
 
@@ -182,6 +206,7 @@ public class AiManager : MonoBehaviour
         initialSpeed = Player.splineFollower.followSpeed;
         Player.splineFollower.followSpeed += 20;
         playerBoostTime = true;
+        RaceStats.BeginRace();
         effects.windLines.SetActive(true);
 
         for (int i = 0; i < allAgents.Length; i++)
@@ -203,6 +228,16 @@ public class AiManager : MonoBehaviour
 
         for (int i = 0; i < allAgents.Length; i++)
         {
+            if (finishedAgents.Contains(allAgents[i]))
+            {
+                continue;   // already on the end spline: its percent is not a race position any more
+            }
+
+            if (!allAgents[i].follow)
+            {
+                continue;   // in the air: teleporting it would leave it flying from the new spot (ReturnFallenAgents handles falls)
+            }
+
             baseSpeeds[i] = Random.Range(minSpeed, maxSpeed);
             allAgents[i].followSpeed = baseSpeeds[i];
             boostLeft[i] = 0f;
@@ -219,9 +254,11 @@ public class AiManager : MonoBehaviour
                 continue;   // already close behind the player, in view: moving it would be visible
             }
 
-            // Pull it up to just behind the camera, never further back than where it already is.
+            // Pull it up to just behind the camera, never further back than where it already is. On spirals the track
+            // behind the player can be in view (a lap above or beside), so use the first spot the camera cannot see.
             float target = hiddenGap + moved * respawnSpacing;
             moved++;
+            target = HiddenSpotBehind(playerPercent, target, gap, length);
             if (target < gap)
             {
                 allAgents[i].SetPercent(playerPercent - target / length);
@@ -244,7 +281,7 @@ public class AiManager : MonoBehaviour
         float length = RaceLength;
         for (int i = 0; i < boostLeft.Length; i++)
         {
-            if (boostLeft[i] <= 0f)
+            if (boostLeft[i] <= 0f || finishedAgents.Contains(allAgents[i]))
             {
                 continue;
             }
@@ -274,6 +311,33 @@ public class AiManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// First distance (metres behind the player along the track, from 'from' in 10 m steps) whose spot is outside the camera's
+    /// view. Returns 'limit' when every spot up to there can be seen (the racer is then left where it is).
+    /// </summary>
+    private float HiddenSpotBehind(double playerPercent, float from, float limit, float length)
+    {
+        Camera cam = Camera.main;
+        SplineComputer spline = Player.splineFollower.spline;
+        if (cam == null || spline == null)
+        {
+            return from;
+        }
+
+        Plane[] planes = GeometryUtility.CalculateFrustumPlanes(cam);
+        for (float g = from; g < limit; g += 10f)
+        {
+            double percent = System.Math.Max(0.0, playerPercent - g / length);
+            Vector3 spot = spline.EvaluatePosition(percent);
+            if (!GeometryUtility.TestPlanesAABB(planes, new Bounds(spot, Vector3.one * 8f)))
+            {
+                return g;
+            }
+        }
+
+        return limit;
+    }
+
     /// <summary>How far behind the player (metres along the track) an AI racer has to be to be out of the camera's view.</summary>
     private float HiddenGapMeters()
     {
@@ -287,23 +351,143 @@ public class AiManager : MonoBehaviour
         return Mathf.Max(minHiddenGap, cameraDistance + hiddenGapMargin);
     }
 
-    private void Positioning()
+    /// <summary>An AI racer crossed the finish line (it then switches to the end spline, so its percent no longer counts).</summary>
+    public void AgentFinished(SplineFollower agent)
     {
-        distances.Clear();
-
-        for (int i = 0; i < allAgents.Length; i++)
+        if (!finishedAgents.Contains(agent))
         {
-            distances.Add(allAgents[i].GetPercent());
+            finishedAgents.Add(agent);
+        }
+    }
+
+    /// <summary>
+    /// The player reached the finish (finish line or straight into the pool). Their place is fixed now: one behind every AI
+    /// racer that finished earlier, whatever happens afterwards.
+    /// </summary>
+    public void PlayerFinished()
+    {
+        if (playerRankLocked)
+        {
+            return;
         }
 
-        double playerPercent = Player.splineFollower.GetPercent();
-        distances.Add(playerPercent);
+        playerRankLocked = true;
+        PlayerRank = finishedAgents.Count + 1;
+        playerPosition.text = GetOrdinal(PlayerRank);
+    }
 
-        var sorted = distances.OrderByDescending(d => d).ToList();
+    private void Positioning()
+    {
+        if (inLobby || playerRankLocked)
+        {
+            return;
+        }
 
-        int rank = sorted.IndexOf(playerPercent) + 1;
+        // Once the race is over (e.g. the player fell) the place shown stays as it was.
+        if (GameManager.Instance != null && GameManager.Instance.gameOver)
+        {
+            playerRankLocked = true;
+            return;
+        }
+
+        distances.Clear();
+        double playerProgress = TrackProgress(Player.splineFollower, Player.transform);
+        int rank = 1;
+        for (int i = 0; i < allAgents.Length; i++)
+        {
+            double progress = AgentProgress(allAgents[i]);
+            distances.Add(System.Math.Min(progress, 1.0));
+            if (progress > playerProgress)
+            {
+                rank++;
+            }
+        }
+        distances.Add(playerProgress);
+
         PlayerRank = rank;
         playerPosition.text = GetOrdinal(rank);
+    }
+
+    // Finished AI racers rank ahead of everyone still racing, in the order they finished (values above 1).
+    private double AgentProgress(SplineFollower agent)
+    {
+        int order = finishedAgents.IndexOf(agent);
+        if (order >= 0)
+        {
+            return 2.0 - order * 0.001;
+        }
+
+        return TrackProgress(agent, agent.transform);
+    }
+
+    // Percent along the race spline. A racer in the air is not moved by its follower, so its percent would freeze at the
+    // take-off point while everyone else keeps going; use the closest point of the track under it instead (never less).
+    // Only while it is near the track: a racer knocked off onto the ground can be closest to any far part of the track.
+    private static double TrackProgress(SplineFollower follower, Transform body)
+    {
+        double percent = follower.GetPercent();
+        if (!follower.follow && follower.spline != null)
+        {
+            SplineSample sample = new SplineSample();
+            follower.Project(body.position, ref sample);
+            if (Vector3.Distance(sample.position, body.position) <= OffTrackDistance)
+            {
+                percent = System.Math.Max(percent, sample.percent);
+            }
+        }
+
+        return percent;
+    }
+
+    /// <summary>
+    /// AI racers knocked off the slide never land on it again (they would slide along the sand or ocean for the rest of the
+    /// race). Once one is clearly off the track, put it back on the slide at a spot behind the player the camera cannot see,
+    /// with the usual catch-up boost.
+    /// </summary>
+    private void ReturnFallenAgents()
+    {
+        rescueTimer -= Time.deltaTime;
+        if (rescueTimer > 0f || inLobby || GameManager.Instance == null || !GameManager.Instance.gameStarted || GameManager.Instance.gameOver)
+        {
+            return;
+        }
+
+        rescueTimer = 0.5f;
+        double playerPercent = Player.splineFollower.GetPercent();
+        float length = RaceLength;
+        float hiddenGap = HiddenGapMeters();
+        for (int i = 0; i < allAgents.Length; i++)
+        {
+            SplineFollower agent = allAgents[i];
+            if (agent.follow || finishedAgents.Contains(agent) || agent.spline == null)
+            {
+                continue;
+            }
+
+            SplineSample sample = new SplineSample();
+            agent.Project(agent.transform.position, ref sample);
+            if (Vector3.Distance(sample.position, agent.transform.position) <= OffTrackDistance)
+            {
+                continue;   // a normal jump or bump: it lands by itself
+            }
+
+            float gap = HiddenSpotBehind(playerPercent, hiddenGap, hiddenGap + 300f, length);
+            AiMover mover = agent.GetComponent<AiMover>();
+            if (mover == null)
+            {
+                continue;
+            }
+
+            if (mover.PushedByPlayerWithin(8f))
+            {
+                RaceStats.KnockedOff();   // the player threw it off the slide
+            }
+
+            mover.ReturnToTrack(System.Math.Max(0.0, playerPercent - gap / length));
+            baseSpeeds[i] = Random.Range(minSpeed, maxSpeed);
+            agent.followSpeed = baseSpeeds[i] * (1f + Random.Range(catchUpBoostMin, catchUpBoostMax));
+            boostLeft[i] = catchUpMaxSeconds;
+        }
     }
 
     string GetOrdinal(int number)

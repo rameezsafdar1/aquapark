@@ -28,6 +28,14 @@ public static class SaveData
         public int coinBoostRaces;
         public List<string> ownedSkins = new List<string>();
         public string equippedSkin = "";
+        public string equippedFloatie = "";
+        public int missionIndex;
+        public int missionCycle;
+        public float missionProgress;
+        public bool missionRewardPending;
+        public int cupRound;
+        public int cupSeed;
+        public List<int> cupOut = new List<int>();
     }
 
     private static Data data;
@@ -70,6 +78,50 @@ public static class SaveData
     /// <summary>Races left that pay double coins (wheel prize).</summary>
     public static int CoinBoostRaces { get => D.coinBoostRaces; set { D.coinBoostRaces = Mathf.Max(0, value); Commit(); } }
     public static string EquippedSkin { get => D.equippedSkin; set { D.equippedSkin = value ?? ""; Commit(); } }
+    public static string EquippedFloatie { get => D.equippedFloatie; set { D.equippedFloatie = value ?? ""; Commit(); } }
+
+    /// <summary>Mission card: which mission of the list is active, and how many times the list has repeated.</summary>
+    public static int MissionIndex => D.missionIndex;
+    public static int MissionCycle => D.missionCycle;
+    /// <summary>Progress on the active mission (count, seconds, or best single race).</summary>
+    public static float MissionProgress { get => D.missionProgress; set { D.missionProgress = Mathf.Max(0f, value); Commit(); } }
+    /// <summary>The active mission is done and its reward waits to be claimed on the menu.</summary>
+    public static bool MissionRewardPending { get => D.missionRewardPending; set { D.missionRewardPending = value; Commit(); } }
+
+    /// <summary>Starts a mission from scratch.</summary>
+    public static void SetMission(int index, int cycle)
+    {
+        D.missionIndex = Mathf.Max(0, index);
+        D.missionCycle = Mathf.Max(0, cycle);
+        D.missionProgress = 0f;
+        D.missionRewardPending = false;
+        Commit();
+    }
+
+    /// <summary>Qualifier cup: rounds played in the current cup (0-3), the seed that picks its 32 racers, and who has drowned.</summary>
+    public static int CupRound => D.cupRound;
+    public static int CupSeed => D.cupSeed;
+    public static IReadOnlyList<int> CupOut => D.cupOut;
+
+    /// <summary>Stores the cup after a round: how many rounds are done and every racer that has drowned so far.</summary>
+    public static void SetCup(int round, int seed, List<int> drowned)
+    {
+        D.cupRound = Mathf.Max(0, round);
+        D.cupSeed = seed;
+        D.cupOut = new List<int>(drowned);
+        Commit();
+    }
+
+    /// <summary>Starts the cup over (a lost race, or a finished cup).</summary>
+    public static void ResetCup()
+    {
+        if (D.cupRound == 0 && D.cupOut.Count == 0)
+        {
+            return;
+        }
+
+        SetCup(0, 0, new List<int>());
+    }
 
     public static bool OwnsSkin(string id) => D.ownedSkins.Contains(id);
 
@@ -80,6 +132,18 @@ public static class SaveData
             D.ownedSkins.Add(id);
             Commit();
         }
+    }
+
+    /// <summary>
+    /// The project enters Play mode without a domain reload, so statics outlive a play session. Without this the save
+    /// loaded last session stays in memory: clearing PlayerPrefs would not reset anything, and the next change would
+    /// write the old save back. Runs before any Awake, so each session reads PlayerPrefs fresh.
+    /// </summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        data = null;
+        Changed = null;
     }
 
     /// <summary>Wipes the save. Handy from the editor menu while testing.</summary>

@@ -46,8 +46,10 @@ public class TrackGeneratorWindow : EditorWindow
             RangeField("Slope (°)", settings.slopeAngle);
             RangeField("Steep drops", settings.steepSections);
             RangeField("Steep angle (°)", settings.steepAngle);
+            settings.steepSectionLength = EditorGUILayout.FloatField(new GUIContent("Steep drop length (m)", "Length of each steep drop."), settings.steepSectionLength);
             RangeField("Flat stretches", settings.flatSections);
             RangeField("Fountains", settings.fountains);
+            settings.fountainMinDistance = EditorGUILayout.FloatField(new GUIContent("Fountain min distance (m)", "No fountain closer to the start than this."), settings.fountainMinDistance);
             RangeField("AI speed min", settings.aiSpeedMin);
             RangeField("AI speed max", settings.aiSpeedMax);
             EditorGUILayout.Space(4);
@@ -55,6 +57,15 @@ public class TrackGeneratorWindow : EditorWindow
             settings.loopsFromLevel = Mathf.Max(1, EditorGUILayout.IntField(new GUIContent("Loops start at level", "Levels below this have no loops."), settings.loopsFromLevel));
             RangeField("Loops per level", settings.loops);
             RangeField("Loop radius (m)", settings.loopRadius);
+            RangeField("Laps per loop", settings.loopTurns);
+            RangeField("Oval straights (m)", settings.loopStraight);
+            EditorGUILayout.LabelField("Loop shape weights (0 = never)", EditorStyles.miniLabel);
+            settings.roundSpiralWeight = EditorGUILayout.FloatField("Round spiral", settings.roundSpiralWeight);
+            settings.ovalSpiralWeight = EditorGUILayout.FloatField("Oval spiral", settings.ovalSpiralWeight);
+            settings.sCrossoverWeight = EditorGUILayout.FloatField(new GUIContent("S-crossover", "A weaving S that curls back and crosses under itself. At most one per level."), settings.sCrossoverWeight);
+            settings.figureEightWeight = EditorGUILayout.FloatField("Figure-8", settings.figureEightWeight);
+            settings.sSpiralWeight = EditorGUILayout.FloatField(new GUIContent("S-spiral", "1.5 laps one way, then 1.5 laps the other way."), settings.sSpiralWeight);
+            settings.loopSizeVariation = EditorGUILayout.Slider(new GUIContent("Loop size variation", "Each loop's radius varies by up to this much."), settings.loopSizeVariation, 0f, 0.3f);
             settings.loopGap = EditorGUILayout.FloatField(new GUIContent("Gap between laps (m)", "Vertical drop from one lap to the next."), settings.loopGap);
             EditorGUI.indentLevel--;
         }

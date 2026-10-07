@@ -38,6 +38,15 @@ public class AiPush : MonoBehaviour
         MainAi.follower.followSpeed += pushValue;
     }
 
+    /// <summary>True while this racer is off the slide (it cannot knock the player off then).</summary>
+    public bool IsInAir => MainAi.IsInAir;
+
+    /// <summary>The player shoved this racer sideways (if it falls off the slide, it counts for the knock-off missions).</summary>
+    public void PushedByPlayer()
+    {
+        MainAi.MarkPushedByPlayer();
+    }
+
     public void Jump(float horizontalValue)
     {
         MainAi.Jump(horizontalValue);

@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Builds the menu lobby: a short straight tube with water and a wooden deck on both sides.
+/// Builds the menu lobby: a short straight tube with water, a tiled pool deck on both sides and poolside props.
 /// Prefab: Assets/Tracks/Lobby/MenuLobby.prefab. Not a playable level.
 /// </summary>
 public static class LobbyBuilder
@@ -93,6 +93,9 @@ public static class LobbyBuilder
             var deck = StartDeck.Settings.Default;
             deck.length = length;
             StartDeck.Add(root, computer, TrackGenerator.FloorY, d.floorHalfWidth, d.wallRadius, d.wallSweepDegrees, deck);
+
+            // ---- Colourful water-park props on the far deck.
+            LobbyProps.Add(root);
 
             var lobby = root.AddComponent<MenuLobby>();           
 

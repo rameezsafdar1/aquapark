@@ -10,8 +10,8 @@ using UnityEngine;
 public static class StartDeck
 {
     public const string ObjectName = "Start Deck";
-    const string WoodMaterialPath = "Assets/Tracks/Templates/DeckWood.mat";
-    const string PlankTexturePath = "Assets/Tracks/Textures/DeckPlanks.png";
+    const string WoodMaterialPath = "Assets/Tracks/Templates/DeckTiles.mat";          // colourful pool-deck tiles (was wooden planks)
+    const string PlankTexturePath = "Assets/Tracks/Textures/DeckPoolTiles.png";
 
     public struct Settings
     {
@@ -84,7 +84,7 @@ public static class StartDeck
         if (mat != null) return mat;
         var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(PlankTexturePath);
         var shader = Shader.Find("Standard") ?? Shader.Find("Universal Render Pipeline/Lit");
-        mat = new Material(shader) { name = "DeckWood", mainTexture = tex };
+        mat = new Material(shader) { name = "DeckTiles", mainTexture = tex };
         mat.SetFloat("_Glossiness", 0.15f);
         AssetDatabase.CreateAsset(mat, WoodMaterialPath);
         return mat;

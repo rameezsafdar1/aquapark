@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d188cb28e036d824e9263392633ed2e8, type: 3}
+  m_Name: M11_Win5
+  m_EditorClassIdentifier: Assembly-CSharp::MissionDefinition
+  title: Win {0} races
+  type: 0
+  target: 5
+  withinOneRace: 0
+  reward:
+    kind: 0
+    amount: 250
+    skinId: 
+    fallbackCoins: 500

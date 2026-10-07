@@ -215,24 +215,30 @@ public static partial class AquaUIBuilder
         return asset;
     }
 
+    [MenuItem("Aquapark/UI/Rebuild Skin Lists")]
+    public static void SkinListsMenu()
+    {
+        MakeSkinDatabase();
+        Debug.Log("Skin lists rebuilt.");
+    }
+
+    /// <summary>
+    /// The character and floatie lists. Icons come from SkinIconRenderer (menu Aquapark > UI > Render Skin Icons), which
+    /// photographs the real models under the scene's "Characters Temp" object; the first argument is that object's name.
+    /// Ids are stored in save files, so never rename one after release.
+    /// </summary>
     private static void MakeSkinDatabase()
     {
         Directory.CreateDirectory(DataDir);
-        string path = DataDir + "/SkinDatabase.asset";
-        var db = AssetDatabase.LoadAssetAtPath<SkinDatabase>(path);
-        if (db == null)
-        {
-            db = ScriptableObject.CreateInstance<SkinDatabase>();
-            AssetDatabase.CreateAsset(db, path);
-        }
 
-        SkinData Make(string id, string name, SkinUnlock unlock, int price, RewardType currency, int level, SkinRarity rarity, int color, bool owned)
+        SkinData Make(string dir, string objectName, string id, string name, SkinUnlock unlock, int price, RewardType currency, int level, SkinRarity rarity, int color, bool owned)
         {
             return new SkinData
             {
                 id = id,
                 displayName = name,
-                icon = Spr("char_" + id),
+                icon = AssetDatabase.LoadAssetAtPath<Sprite>(dir + "/" + SkinIconRenderer.IdFor(objectName) + ".png"),
+                modelName = objectName,
                 unlock = unlock,
                 price = price,
                 currency = currency,
@@ -243,20 +249,102 @@ public static partial class AquaUIBuilder
             };
         }
 
-        db.skins = new[]
+        const string C = SkinIconRenderer.CharacterDir;
+        const RewardType Coins = RewardType.Coins, Gems = RewardType.Gems;
+        SaveList("SkinDatabase", SkinSlot.Character, new[]
         {
-            Make("penguin", "Cool Penguin", SkinUnlock.Free, 0, RewardType.Coins, 0, SkinRarity.Epic, 0, true),
-            Make("pickle", "Pickle", SkinUnlock.Free, 0, RewardType.Coins, 0, SkinRarity.Common, 1, true),
-            Make("bubble", "Bubble", SkinUnlock.Free, 0, RewardType.Coins, 0, SkinRarity.Common, 1, true),
-            Make("duck", "Duck", SkinUnlock.Currency, 1500, RewardType.Coins, 0, SkinRarity.Rare, 2, false),
-            Make("shark", "Shark", SkinUnlock.RewardedAd, 0, RewardType.Coins, 0, SkinRarity.Rare, 1, false),
-            Make("alien", "Alien", SkinUnlock.Currency, 80, RewardType.Gems, 0, SkinRarity.Epic, 0, false),
-            Make("fox", "Fox", SkinUnlock.PlayerLevel, 0, RewardType.Coins, 12, SkinRarity.Rare, 3, false),
-            Make("ghost", "Ghost", SkinUnlock.PlayerLevel, 0, RewardType.Coins, 12, SkinRarity.Legendary, 3, false)
-        };
+            Make(C, "Ghost", "ghost", "Ghost", SkinUnlock.Free, 0, Coins, 0, SkinRarity.Common, 1, true),
+            Make(C, "penguin guy", "penguin", "Penguin", SkinUnlock.Free, 0, Coins, 0, SkinRarity.Common, 1, true),
+            Make(C, "Banana", "banana", "Banana", SkinUnlock.Free, 0, Coins, 0, SkinRarity.Common, 2, true),
+            Make(C, "Hot dog", "hot_dog", "Hot Dog", SkinUnlock.Currency, 750, Coins, 0, SkinRarity.Common, 3, false),
+            Make(C, "Sausage", "sausage", "Sausage", SkinUnlock.Currency, 750, Coins, 0, SkinRarity.Common, 3, false),
+            Make(C, "Frenchfries", "french_fries", "Fries", SkinUnlock.Currency, 1000, Coins, 0, SkinRarity.Common, 3, false),
+            Make(C, "Lego", "lego", "Lego", SkinUnlock.Currency, 1500, Coins, 0, SkinRarity.Rare, 2, false),
+            Make(C, "Flower", "flower", "Flower", SkinUnlock.Currency, 1500, Coins, 0, SkinRarity.Rare, 2, false),
+            Make(C, "Pink flower", "pink_flower", "Pink Flower", SkinUnlock.RewardedAd, 0, Coins, 0, SkinRarity.Rare, 1, false),
+            Make(C, "Clown", "clown", "Clown", SkinUnlock.RewardedAd, 0, Coins, 0, SkinRarity.Rare, 1, false),
+            Make(C, "Lobster", "lobster", "Lobster", SkinUnlock.Currency, 2500, Coins, 0, SkinRarity.Rare, 2, false),
+            Make(C, "Shark", "shark", "Shark", SkinUnlock.RewardedAd, 0, Coins, 0, SkinRarity.Rare, 1, false),
+            Make(C, "Hateye", "hat_eye", "Hat Eye", SkinUnlock.Currency, 3000, Coins, 0, SkinRarity.Rare, 2, false),
+            Make(C, "Battery hat charc", "battery", "Battery", SkinUnlock.Currency, 3500, Coins, 0, SkinRarity.Rare, 2, false),
+            Make(C, "Squeeze_hat", "squeeze", "Squeeze", SkinUnlock.PlayerLevel, 0, Coins, 5, SkinRarity.Rare, 3, false),
+            Make(C, "Multi eye", "multi_eye", "Multi Eye", SkinUnlock.PlayerLevel, 0, Coins, 8, SkinRarity.Epic, 0, false),
+            Make(C, "Love guy", "love_guy", "Love Guy", SkinUnlock.Currency, 60, Gems, 0, SkinRarity.Epic, 0, false),
+            Make(C, "star glasses char", "star_glasses", "Star Glasses", SkinUnlock.Currency, 80, Gems, 0, SkinRarity.Epic, 0, false),
+            Make(C, "King", "king", "King", SkinUnlock.PlayerLevel, 0, Coins, 12, SkinRarity.Epic, 0, false),
+            Make(C, "Princess", "princess", "Princess", SkinUnlock.Currency, 100, Gems, 0, SkinRarity.Epic, 0, false),
+            Make(C, "Astronaut", "astronaut", "Astronaut", SkinUnlock.PlayerLevel, 0, Coins, 15, SkinRarity.Legendary, 3, false),
+            Make(C, "UFO", "ufo", "UFO", SkinUnlock.Currency, 150, Gems, 0, SkinRarity.Legendary, 0, false)
+        });
 
-        EditorUtility.SetDirty(db);
+        const string F = SkinIconRenderer.FloatieDir;
+        SaveList("FloatieDatabase", SkinSlot.Floatie, new[]
+        {
+            Make(F, "watermelon_001", "floatie_watermelon", "Watermelon", SkinUnlock.Free, 0, Coins, 0, SkinRarity.Common, 1, true),
+            Make(F, "orange_002", "floatie_orange", "Orange", SkinUnlock.Currency, 500, Coins, 0, SkinRarity.Common, 3, false),
+            Make(F, "lime_002", "floatie_lime", "Lime", SkinUnlock.Currency, 750, Coins, 0, SkinRarity.Common, 2, false),
+            Make(F, "grapefruit_002", "floatie_grapefruit", "Grapefruit", SkinUnlock.RewardedAd, 0, Coins, 0, SkinRarity.Rare, 1, false),
+            Make(F, "melon_002", "floatie_melon", "Melon", SkinUnlock.Currency, 1500, Coins, 0, SkinRarity.Rare, 2, false),
+            Make(F, "pineapple_001", "floatie_pineapple", "Pineapple", SkinUnlock.PlayerLevel, 0, Coins, 6, SkinRarity.Rare, 3, false),
+            Make(F, "cucumber_001", "floatie_cucumber", "Cucumber", SkinUnlock.Currency, 50, Gems, 0, SkinRarity.Epic, 0, false),
+            Make(F, "cheese_001", "floatie_cheese", "Cheese", SkinUnlock.Currency, 80, Gems, 0, SkinRarity.Epic, 0, false)
+        });
+
         AssetDatabase.SaveAssets();
+    }
+
+    private static void SaveList(string fileName, SkinSlot slot, SkinData[] items)
+    {
+        string path = DataDir + "/" + fileName + ".asset";
+        var db = AssetDatabase.LoadAssetAtPath<SkinDatabase>(path);
+        if (db == null)
+        {
+            db = ScriptableObject.CreateInstance<SkinDatabase>();
+            AssetDatabase.CreateAsset(db, path);
+        }
+
+        // The lists below are only the defaults for items that are not in the asset yet. Items already there keep
+        // everything set in the Skins & Floaties Manager (name, unlock, price, level, rarity, colour, order); only
+        // their picture and model name are refreshed. Items added by hand in the manager are kept too.
+        var merged = new List<SkinData>();
+        var defaults = new Dictionary<string, SkinData>();
+        foreach (SkinData item in items)
+        {
+            item.slot = slot;
+            defaults[item.id] = item;
+        }
+
+        if (db.skins != null)
+        {
+            foreach (SkinData existing in db.skins)
+            {
+                if (existing == null || string.IsNullOrEmpty(existing.id))
+                {
+                    continue;
+                }
+
+                existing.slot = slot;
+                if (defaults.TryGetValue(existing.id, out SkinData fresh))
+                {
+                    existing.icon = fresh.icon;
+                    existing.modelName = fresh.modelName;
+                    defaults.Remove(existing.id);
+                }
+
+                merged.Add(existing);
+            }
+        }
+
+        foreach (SkinData item in items)
+        {
+            if (defaults.ContainsKey(item.id))
+            {
+                merged.Add(item);
+            }
+        }
+
+        db.skins = merged.ToArray();
+        EditorUtility.SetDirty(db);
     }
 
     private static void LoadInfo()
