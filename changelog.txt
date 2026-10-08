@@ -583,3 +583,148 @@ Every change made in this project is logged here (newest at the bottom).
 - AiManager.InitAi: the player's starting row is now picked from 0..(AI count - 3) / 2 instead of any row, so at least
   3 AI racers always start ahead of them (player starts 4th or worse when the countdown begins). New const MinAiAhead = 3.
   With fewer than 3 AI the player simply starts last.
+
+== 2026-10-08 - Outlined text: letters no longer cut into each other ==
+- Cause: TextMeshPro draws each letter with its own outline/shadow, so in tight pairs (the "TA" in RESTART) the next
+  letter's navy outline painted over the previous letter. Figma draws all strokes under all fills.
+- New Assets/1- Scripts/UI/Core/TextFillOverlay.cs + TextFillGraphic.cs: redraws the letter faces on top from the text's
+  own mesh (same material with outline/shadow made clear). In Play mode it attaches itself automatically to every
+  TextMeshProUGUI whose material has OUTLINE_ON or UNDERLAY_ON (scene, prefabs, runtime texts) - no scene/prefab edits.
+  The overlay is a hidden, never-saved child.
+- Unity's bee_backend.exe was crashing on every script compile (access violation); fixed by deleting Library/Bee.
+- Verified in Play mode with screenshots of the pause popup.
+
+== 2026-10-08 - Kerning off on all game text ==
+- Removed the "kern" font feature from every TextMeshPro text in gameplay.unity (148 of 149; one already had it off),
+  done in the open scene through the API - the scene is NOT saved (it had the user's unsaved edits).
+- TMP Settings (Assets/TextMesh Pro/Resources/TMP Settings.asset): default font features emptied, so new texts
+  (e.g. from an AquaUI rebuild) start with kerning off.
+- Third-party demo kits (GUI PRO Kit, TMP examples) are not in the build and were left alone.
+
+== 2026-10-08 - VIP subscription offer screen (Figma '09 · VIP Subscription Offer') ==
+- Figma image API hit the Starter-plan quota (Retry-After ~3 days), so the art was made without per-node exports:
+  figma_data/vip_bg.py redraws the background from the Figma data (gradient, sunburst, glow, bubbles - pixel-exact);
+  figma_data/vip_build.py draws the plan cards / radios / trial pill with the Figma styles and mattes the static art
+  (header, subtitle, showcase + benefit icons, close, restore, continue, card previews, check) out of one 2x frame
+  render (figma_data/raw/vip_full.png) against the known background. New sprites: Assets/UI/Figma/Sprites/vip_*.png.
+- New runtime VipOfferScreen (UI/Screens): plan selection, Continue -> PurchaseService.Purchase("vip_skin_set_1|2")
+  -> SaveData.VipPlan + NoAds, Restore, Terms/Privacy/Subscription links (URLs empty for now -> toast),
+  price text from PurchaseService.GetPrice (fallback "INR 819").
+- SaveData: vipPlan (0 none, 1/2) + IsVip.
+- UIManager: vip panel, OpenVip/CloseVip, back button, hides home/footer while open; shown once per app launch to
+  returning players (Level > 1) who are not VIP (toggle showVipOnLaunch).
+- Builder: Editor/AquaUI/AquaUIBuilder.Vip.cs, called from Build(); UI rebuilt and gameplay.unity saved.
+- Design fix: benefit labels' second line ran under the first card in Figma; labels are drawn on top in Unity.
+- Not done yet: VIP perks (40 VIP skins, daily gems, x2 coins) - no VIP skins exist in the game; showcase skins are
+  the Figma placeholders ("3D render slot").
+
+== 2026-10-08 - VIP offer: showcase video slot + real character count ==
+- Headline "UNLOCK 40 VIP SKINS" -> live number = characters in SkinDatabase (22 now). "UNLOCK" and "VIP SKINS"
+  are separate pictures (vip_unlock / vip_vipskins); the number is TMP (green gradient, navy outline) and
+  VipOfferScreen.LayoutHeadline re-centres the three when the screen opens (also run by the builder).
+- Showcase (placeholder characters, platforms, LEGENDARY tag) can be replaced by a looping video:
+  drop a clip in Assets/UI/Vip and rebuild the UI (builder takes the first clip there), or set
+  VipOfferScreen.showcaseClip. Slot = design rect (0, 232, 390 x 195), clip keeps its aspect inside it.
+  The Figma art stays as the fallback until the first frame is ready. Benefit icons split into vip_benefits so they
+  stay on top of the video.
+- Optional green-screen keying: VipOfferScreen.chromaKey + keyColor/threshold/smoothness, shader
+  Assets/UI/Figma/Shaders/UIChromaKey.shader ("UI/Aqua Chroma Key"), material UIChromaKey.mat.
+- Tested in Play mode with a generated green-screen clip (deleted afterwards). UI rebuilt, gameplay.unity saved.
+
+== 2026-10-08 - VIP offer: user's gameplay video as full-screen background ==
+- Assets/Videos/Movie_037.mp4 (1080x2340 portrait gameplay recording, 23 s) now plays muted and looping behind the
+  whole VIP screen, replacing the sunburst and the placeholder characters (both still used when no clip is set).
+- The builder picks the first clip in Assets/UI/Vip or Assets/Videos (FindShowcaseClip).
+- VipOfferScreen.CropFor covers the screen without stretching; videoZoom (1.25) + videoFocusY (0 = keep bottom) push
+  the recording's race HUD off the top. Tweak both in the inspector on AquaUI/Vip.
+- New readability shade (Sprites/vip_video_shade.png): deep purple, 45 % at the top, clear in the middle, 85 % behind
+  the cards and small print. The small rounded "video card" idea was dropped.
+- The VideoPlayer lives on the panel object (a player on an inactive object can't prepare).
+- Clip is 29 MB with an audio track; consider transcoding to a lower bitrate and dropping audio before release.
+
+== 2026-10-08 - VIP offer: headline is all live text ==
+- "UNLOCK" and "VIP SKINS" pictures (vip_unlock / vip_vipskins) removed; now TextMeshPro (Lilita One 24, white,
+  navy outline 3.8 + shadow 3) next to the live count (Lilita 38, green gradient, outline 5).
+- VipOfferScreen.unlockText / vipSkinsText replace unlockPiece / vipSkinsPiece; LayoutHeadline measures all three
+  texts and centres the line with 7 px gaps. Sprites and units.json entries deleted; vip_build.py no longer cuts them.
+- UI rebuilt, gameplay.unity saved (videoZoom kept at 1.25).
+
+== 2026-10-08 - New VIP offer: Welcome Back screen ==
+- New design from Assets/2D/Subs Screen (sliced sheet + gradient.png water with characters), built as a separate
+  screen; the old VipOfferScreen stays built and still opens with UIManager.OpenVip().
+- NEW Scripts/UI/Screens/WelcomeBackScreen.cs: two tick options (one ticked at a time, Selected index), Continue
+  (closeOnContinue - turn off once the IAP button is attached), gameplay video (Assets/Videos/Movie_037.mp4) at the top.
+- NEW Editor/AquaUI/AquaUIBuilder.WelcomeBack.cs: writes Assets/UI/WelcomeBack/welcome_water.png (gradient.png with its
+  top 22-35.5 % faded out so the video shows above the splash) and splits the sheet's option row into
+  welcome_option_box / welcome_option_bar (bar tinted 55 % for the frosted look). Redone when the sources change.
+  Title, tick and Continue are the sheet sprites _3, _2, _8. Everything is anchored as shares of the water picture,
+  so the mockup's proportions hold on every screen; the video fills the screen above the opaque water line.
+- UIManager: welcomeBack field, Open/CloseWelcomeBack, back key, menu hiding. On launch it shows instead of the old
+  VIP offer (same rule: once per launch, Level > 1, not VIP); the old one shows only when welcomeBack is unset.
+- Option texts are placeholders. No close button in the design; Android back closes it.
+- Rebuilt UI, saved gameplay.unity. Checked captures at 390x844, 450x800, 360x800, 600x800 and in Play mode
+  (opens on launch, video plays, ticks swap, Continue closes).
+
+== 2026-10-08 - Welcome Back offer: small print, video gets the top half ==
+- Small print at the bottom (user's wording): "Choose Set 1 or Set 2 ... Set 1 renews at {0}/week and Set 2 at
+  {1}/week ..." + tappable "Terms & Conditions" / "Subscription Policy" links (TMP <link> tags, NEW UI/Core/TextLinks.cs).
+- Prices come from PurchaseService.GetPrice(productIds[i], fallbackPrice) = the store's localized Play Console price
+  once PriceLookup is hooked to IAP; refreshed on open and every second while open. productIds default to
+  vip_skin_set_1 / vip_skin_set_2 (same as the old VIP screen), fallback "INR 819". Template, URLs and ids are
+  inspector fields on AquaUI/WelcomeBack (termsUrl / subscriptionPolicyUrl still empty - tapping shows a toast).
+- Layout: WelcomeBackScreen.Layout lifts the water (with title/options/Continue) so the video fills videoShare (50 %)
+  of the screen, keeping legalSpace (92) for the small print; the water continues below as its mirror image and a
+  navy shade (Assets/UI/WelcomeBack/welcome_legal_shade.png) sits behind the text.
+- NEW menu Aquapark > UI > Rebuild Welcome Back Only (AquaUIBuilder.RebuildWelcomeBack): replaces just that panel and
+  leaves every other panel untouched. The panel is saved switched off.
+- Fix: after the earlier full rebuild the scene was saved with WelcomeBack on and Menu/Home off; now only Menu
+  (Home + Footer) is active. Checked against HEAD: no other texts or panels lost (differences are the VIP screen and
+  skin-list data).
+- Checked captures at 390x844, 450x800, 600x800 and Play mode (video top half, prices filled in).
+
+== 2026-10-08 - Welcome Back offer: option texts ==
+- Option labels (AquaUI/WelcomeBack/Option1|2/Label) set to "get 20 set 1|2 waterpark rides for INR 819/weekly
+  recurring subscription with 3 day trial". Price is a fixed INR 819 for now; making it dynamic from the store is later.
+- The sentence doesn't fit one line even at the minimum auto-size (8), so only these two labels now wrap to two lines
+  (line spacing -8, auto-size ~10.5). Nothing else on the screen was touched; set via the open scene (not saved by me,
+  the scene also holds the user's own unsaved edits). Builder defaults updated to the same text/wrapping.
+
+== 2026-10-08 - Welcome Back offer: close button ==
+- Added AquaUI/WelcomeBack/Close (the VIP screen's pink X sprite vip_close, 68x72, top-right, same spot as on the
+  VIP screen, last child so it draws on top). Added straight into the scene with AquaUIBuilder.AddWelcomeClose -
+  nothing else on the panel changed (user's own edits kept); the builder adds it too on a future panel rebuild.
+- WelcomeBackScreen: closeButton + closeDelay (3 s default). The button is hidden when the screen opens and appears
+  after closeDelay seconds (unscaled time); tapping it closes the screen. closeDelay will come from a JSON file on
+  Google Drive later (not done yet).
+- Tested in Play mode (hidden on open, visible after 3 s, closes). Scene saved with only Menu (Home, Footer) active.
+
+== 2026-10-08 - Main menu: Aqua Rush logo from the Subs Screen sheet ==
+- Menu/Home/logo now shows the Aqua Rush logo (slide, palms, splash) from "Assets/2D/Subs Screen/Aqua Park Waterpark UI
+  Sprite Sheet (1).png" (slice _0, 424x323) instead of the Figma "AQUA RUSH!" wordmark. 236x180 design px, preserve aspect,
+  centred under the currency bar. The existing LogoAnimator (pop-in, bob/breathe, masked shine sweep) is unchanged and
+  now runs on the new logo; the shine is clipped to the logo's outline.
+- The logo is much taller than the wordmark, so the level pill (badge, track, fill, %) and the Daily / No Ads tiles
+  (tile, banner, button, badge) moved 80 design px down. Nothing else on Home or other panels was touched.
+- Applied straight to the open scene (no UI rebuild) and saved with only Menu (Home, Footer) active. AquaUIBuilder.Menu.cs
+  BuildHome updated to match (MenuLogoSprite, LogoShift = 80) so a future Home rebuild keeps it.
+- Verified: edit-mode render + Play-mode screenshot with the shine mid-sweep.
+- Note: the logo is drawn ~1.7x its source size on 1080+ wide phones, so it's a little soft; a 2x export of the logo would fix it.
+
+== 2026-10-08 - Purchase Failed fail-safe panel ==
+- Request: new fail-safe screen after a failed purchase, built from Assets/2D/Subs Screen/Purchase Failed Waterpark Splash UI.png to match the user's mockup; gameplay video (Assets/Videos) as background; close button like the Welcome Back screen. Only this panel was created - no other panel, text or asset touched.
+- NEW Assets/1- Scripts/UI/Screens/PurchaseFailedScreen.cs: full-screen looping video (zoom 1.25 from the bottom to hide the recording's HUD), close button appears after closeDelay (3 s), price line "WEEKLY {price}/ RECURRING" and the small print both use PurchaseService.GetPrice(productId "vip_weekly", fallback "INR 819") and refresh every second, so the localized Play Console price drops in once the IAP package sets PriceLookup. No buy button yet (IAP comes later).
+- NEW Assets/Editor/AquaUI/AquaUIBuilder.PurchaseFailed.cs: builds the panel (navy backdrop, video, light shade, card centred at 374 design px wide, texts placed in card-picture pixels), menu Aquapark > UI > Rebuild Purchase Failed Only (single-panel rebuild, placed right after WelcomeBack so it draws above the offers and below the toast).
+- UIManager: new purchaseFailed field, OpenPurchaseFailed()/ClosePurchaseFailed(), hidden on start and in CloseAllMenuPanels, counted as a popup in RefreshMenu, Back button closes it first.
+- Ran RebuildPurchaseFailed in gameplay.unity and saved (only AquaUI/Menu active). Verified with AquaUIShot captures and in Play mode: video plays behind the card, close button appears and closes the panel; small print fits its box (Fredoka max 9).
+
+== 2026-10-08 - Plain X close button + fail-safe terms links ==
+- Welcome Back and Purchase Failed: the pink button-style close was replaced by a plain white X with no background
+  (soft navy shadow so it reads over the video). 28 px icon inside an invisible 56 px tap area, same top-right spot,
+  still appears after closeDelay. Shared builder helper MakeCloseX + CloseXSprite (AquaUIBuilder.WelcomeBack.cs);
+  the icon is drawn to Assets/UI/WelcomeBack/close_x.png. The VIP screen's close is unchanged.
+- Purchase Failed small print now ends with the same "Refer to our Terms & Conditions and Subscription Policy." line as
+  Welcome Back, with tappable links (TextLinks; termsUrl / subscriptionPolicyUrl fields, toast "Link not set yet" while
+  empty). Links are blue (#1E6FD9) because the Welcome Back yellow is unreadable on the light box. Text cap lowered to
+  8.4 so the extra line fits inside the box.
+- Applied in place (only the two Close objects replaced, fail-safe legal text/template updated) - neither panel was
+  rebuilt, nothing else touched. Scene saved with only Menu active; verified with AquaUIShot captures.

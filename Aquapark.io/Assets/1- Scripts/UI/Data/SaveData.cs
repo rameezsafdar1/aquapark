@@ -36,6 +36,7 @@ public static class SaveData
         public int cupRound;
         public int cupSeed;
         public List<int> cupOut = new List<int>();
+        public int vipPlan;
     }
 
     private static Data data;
@@ -79,6 +80,9 @@ public static class SaveData
     public static int CoinBoostRaces { get => D.coinBoostRaces; set { D.coinBoostRaces = Mathf.Max(0, value); Commit(); } }
     public static string EquippedSkin { get => D.equippedSkin; set { D.equippedSkin = value ?? ""; Commit(); } }
     public static string EquippedFloatie { get => D.equippedFloatie; set { D.equippedFloatie = value ?? ""; Commit(); } }
+    /// <summary>VIP subscription the player has started: 0 = none, 1 = Skin Set 1, 2 = Skin Set 2.</summary>
+    public static int VipPlan { get => D.vipPlan; set { D.vipPlan = Mathf.Clamp(value, 0, 2); Commit(); } }
+    public static bool IsVip => D.vipPlan > 0;
 
     /// <summary>Mission card: which mission of the list is active, and how many times the list has repeated.</summary>
     public static int MissionIndex => D.missionIndex;

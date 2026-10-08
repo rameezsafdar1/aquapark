@@ -283,6 +283,8 @@ public static partial class AquaUIBuilder
         ui.spin = BuildSpin(menu);
         ui.footer = BuildFooter(menu, home);
         ui.daily = BuildDaily(menu);
+        ui.vip = BuildVip(root);
+        ui.welcomeBack = BuildWelcomeBack(root);
 
         ui.hud = BuildHud(root);
         ui.results = BuildResults(root);

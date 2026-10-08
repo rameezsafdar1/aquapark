@@ -27,6 +27,14 @@ public class UIManager : MonoBehaviour
     public UIPanel spin;
     public UIPanel daily;
     public FooterNav footer;
+    [Tooltip("VIP subscription offer (Figma '09').")]
+    public VipOfferScreen vip;
+    [Tooltip("New VIP offer (Welcome back, Assets/2D/Subs Screen). Shown on launch instead of the older one when set.")]
+    public WelcomeBackScreen welcomeBack;
+    [Tooltip("Fail-safe weekly offer shown after a purchase fails (Assets/2D/Subs Screen). Open with OpenPurchaseFailed().")]
+    public PurchaseFailedScreen purchaseFailed;
+    [Tooltip("Show the VIP offer once per launch to returning players who are not VIP.")]
+    public bool showVipOnLaunch = true;
 
     [Header("Popups")]
     public SettingsPopup settings;
@@ -63,7 +71,7 @@ public class UIManager : MonoBehaviour
         SkinManager.Initialise(floatieDatabase);
         SkinManager.Unlocked += OnItemUnlocked;
 
-        foreach (UIPanel panel in new UIPanel[] { shop, skins, spin, daily, settings, reward, results, pause, qualifier })
+        foreach (UIPanel panel in new UIPanel[] { shop, skins, spin, daily, vip, welcomeBack, purchaseFailed, settings, reward, results, pause, qualifier })
         {
             if (panel != null)
             {
@@ -127,6 +135,23 @@ public class UIManager : MonoBehaviour
         {
             // Back on the menu with a finished mission (e.g. right after the first race): give its reward now.
             StartCoroutine(ShowMissionRewardSoon());
+        }
+        else if (showVipOnLaunch && welcomeBack != null && WelcomeBackScreen.ShouldShowOnLaunch)
+        {
+            StartCoroutine(ShowVipSoon(OpenWelcomeBack));
+        }
+        else if (showVipOnLaunch && welcomeBack == null && vip != null && VipOfferScreen.ShouldShowOnLaunch)
+        {
+            StartCoroutine(ShowVipSoon(OpenVip));
+        }
+    }
+
+    private IEnumerator ShowVipSoon(System.Action open)
+    {
+        yield return new WaitForSecondsRealtime(0.4f);   // let the menu settle first
+        if (state == State.Menu && !daily.IsOpen)
+        {
+            open();
         }
     }
 
@@ -328,6 +353,58 @@ public class UIManager : MonoBehaviour
         RefreshMenu();
     }
 
+    public void OpenVip()
+    {
+        if (state != State.Menu || vip == null)
+        {
+            return;
+        }
+
+        vip.Show();
+        RefreshMenu();
+    }
+
+    public void CloseVip()
+    {
+        vip.Hide();
+        RefreshMenu();
+    }
+
+    public void OpenWelcomeBack()
+    {
+        if (state != State.Menu || welcomeBack == null)
+        {
+            return;
+        }
+
+        welcomeBack.Show();
+        RefreshMenu();
+    }
+
+    public void CloseWelcomeBack()
+    {
+        welcomeBack.Hide();
+        RefreshMenu();
+    }
+
+    /// <summary>Shows the fail-safe offer on top of whatever is open (call it when a purchase fails).</summary>
+    public void OpenPurchaseFailed()
+    {
+        if (state != State.Menu || purchaseFailed == null)
+        {
+            return;
+        }
+
+        purchaseFailed.Show();
+        RefreshMenu();
+    }
+
+    public void ClosePurchaseFailed()
+    {
+        purchaseFailed.Hide();
+        RefreshMenu();
+    }
+
     public void OpenSettings()
     {
         settings.Show();
@@ -367,6 +444,9 @@ public class UIManager : MonoBehaviour
         skins.Hide(true);
         spin.Hide(true);
         daily.Hide(true);
+        if (vip != null) vip.Hide(true);
+        if (welcomeBack != null) welcomeBack.Hide(true);
+        if (purchaseFailed != null) purchaseFailed.Hide(true);
         settings.Hide(true);
         reward.Hide(true);
     }
@@ -375,7 +455,8 @@ public class UIManager : MonoBehaviour
     public void RefreshMenu()
     {
         bool page = shop.IsOpen || skins.IsOpen || spin.IsOpen;
-        bool popup = daily.IsOpen;
+        bool popup = daily.IsOpen || (vip != null && vip.IsOpen) || (welcomeBack != null && welcomeBack.IsOpen)
+                     || (purchaseFailed != null && purchaseFailed.IsOpen);
         home.SetActive(state == State.Menu && !page && !popup);
         footer.gameObject.SetActive(state == State.Menu && !spin.IsOpen && !popup);
         footer.SetVariant(shop.IsOpen ? 1 : skins.IsOpen ? 2 : 0);
@@ -396,7 +477,10 @@ public class UIManager : MonoBehaviour
 
         if (reward.IsOpen) { reward.Hide(); return; }
         if (settings.IsOpen) { settings.Hide(); return; }
+        if (purchaseFailed != null && purchaseFailed.IsOpen) { ClosePurchaseFailed(); return; }
         if (daily.IsOpen) { CloseDaily(); return; }
+        if (vip != null && vip.IsOpen) { CloseVip(); return; }
+        if (welcomeBack != null && welcomeBack.IsOpen) { CloseWelcomeBack(); return; }
         if (shop.IsOpen || skins.IsOpen || spin.IsOpen) { CloseCurrentPage(); }
     }
 

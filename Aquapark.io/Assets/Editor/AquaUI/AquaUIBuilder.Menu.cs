@@ -61,6 +61,9 @@ public static partial class AquaUIBuilder
 
     #region Home and footer
 
+    private const string MenuLogoSprite = "Aqua Park Waterpark UI Sprite Sheet (1)_0";
+    private const float LogoShift = 80f;
+
     private static HomeScreen BuildHome(Transform menu)
     {
         RectTransform home = Container(menu, "Home");
@@ -70,23 +73,28 @@ public static partial class AquaUIBuilder
         StretchX(Unit(home, "vignette_bottom").rectTransform);
         screen.settingsButton = Tappable(Unit(home, "settings_btn"));
         MakeCurrencies(home);
-        Unit(home, "logo").gameObject.AddComponent<LogoAnimator>();
+        // Aqua Rush logo from the Subs Screen sheet (replaces the Figma "AQUA RUSH!" wordmark). It is much taller than the
+        // wordmark, so the level pill and the Daily / No Ads tiles sit LogoShift lower than in the Figma design.
+        Image logo = SetImage(NewRect(home, "logo", new Frame(77, 104, 236, 180), null), SheetSprite(MenuLogoSprite), false);
+        logo.preserveAspect = true;
+        logo.gameObject.AddComponent<LogoAnimator>();
 
         // Level progress pill
-        Gen(home, "lvl_pill", new Frame(70, 212, 250, 48), "LevelPill");
-        Gen(home, "lvl_badge", new Frame(76, 218, 36, 36), "LevelBadge");
-        screen.levelText = Lilita(home, "LevelText", "12", 18, White, new Frame(76, 218, 36, 36), null, TextAlignmentOptions.Center, TextStyle.Shadow(2f, 0.6f));
-        Gen(home, "lvl_track", new Frame(120, 228, 150, 16), "LevelTrack");
-        screen.fillMask = MakeFill(home, "lvl_fill", new Frame(120, 228, 150, 16), "LevelFill");
+        const float s = LogoShift;
+        Gen(home, "lvl_pill", new Frame(70, 212 + s, 250, 48), "LevelPill");
+        Gen(home, "lvl_badge", new Frame(76, 218 + s, 36, 36), "LevelBadge");
+        screen.levelText = Lilita(home, "LevelText", "12", 18, White, new Frame(76, 218 + s, 36, 36), null, TextAlignmentOptions.Center, TextStyle.Shadow(2f, 0.6f));
+        Gen(home, "lvl_track", new Frame(120, 228 + s, 150, 16), "LevelTrack");
+        screen.fillMask = MakeFill(home, "lvl_fill", new Frame(120, 228 + s, 150, 16), "LevelFill");
         screen.fillFullWidth = 150f;
         screen.fillMask.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 96f);
-        screen.percentText = Fredoka(home, "PercentText", "64%", 15, White, new Frame(278, 227, 34, 18), null, TextAlignmentOptions.MidlineLeft);
+        screen.percentText = Fredoka(home, "PercentText", "64%", 15, White, new Frame(278, 227 + s, 34, 18), null, TextAlignmentOptions.MidlineLeft);
 
         BuildMissionCard(home, screen);
 
         // Daily (left) and No Ads (right)
-        MenuButton(home, "Daily", "menu_daily_tile", "menu_daily_banner", "menu_daily_badge", 0f, 0f, out screen.dailyButton, out screen.dailyBadge, out TMP_Text _);
-        MenuButton(home, "NoAds", "menu_noads_tile", "menu_noads_banner", "menu_daily_badge", 0f, 0f, out screen.noAdsButton, out screen.noAdsBadge, out TMP_Text _, float.NaN, 286f);
+        MenuButton(home, "Daily", "menu_daily_tile", "menu_daily_banner", "menu_daily_badge", 0f, LogoShift, out screen.dailyButton, out screen.dailyBadge, out TMP_Text _);
+        MenuButton(home, "NoAds", "menu_noads_tile", "menu_noads_banner", "menu_daily_badge", 0f, LogoShift, out screen.noAdsButton, out screen.noAdsBadge, out TMP_Text _, float.NaN, 286f);
         // Spin lives in the footer now (see BuildFooter).
         return screen;
     }
