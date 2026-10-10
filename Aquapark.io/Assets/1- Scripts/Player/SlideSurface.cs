@@ -93,8 +93,9 @@ public static class SlideSurface
     /// Call from LateUpdate while the racer is on the slide, so it runs after the sideways tweens.
     /// <paramref name="leanAngle"/> adds a lean toward the edge, growing to full at <paramref name="leanReach"/> metres to the side,
     /// so the racer still tilts on the flat floor. The tilt used is whichever is larger, the lean or the slope, never both added.
+    /// <paramref name="heightOffset"/> (metres along root.up) is added to the surface height, e.g. to keep a scaled-up ring at the waterline.
     /// </summary>
-    public static void Follow(Transform root, Transform model, LayerMask slideMask, float leanAngle = 0f, float leanReach = 1f)
+    public static void Follow(Transform root, Transform model, LayerMask slideMask, float leanAngle = 0f, float leanReach = 1f, float heightOffset = 0f)
     {
         float lateral = Vector3.Dot(model.position - root.position, root.right);
         if (!Sample(root, lateral, slideMask, out float rise, out float tilt))
@@ -102,7 +103,7 @@ public static class SlideSurface
             return;
         }
 
-        Apply(model, lateral, rise, tilt, leanAngle, leanReach);
+        Apply(model, lateral, rise + heightOffset, tilt, leanAngle, leanReach);
     }
 
     /// <summary>

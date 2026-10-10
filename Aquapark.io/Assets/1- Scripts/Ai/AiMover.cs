@@ -126,7 +126,7 @@ public class AiMover : MonoBehaviour
 
     private void Update()
     {
-        if (!GameManager.Instance.gameStarted || GameManager.Instance.gameOver)
+        if (!GameManager.Instance.gameStarted || GameManager.Instance.gameOver || frozen)
         {
             return;
         }
@@ -251,6 +251,29 @@ public class AiMover : MonoBehaviour
     /// <summary>True while the racer is off the slide (pushed off or jumping).</summary>
     public bool IsInAir => inAir;
 
+    /// <summary>True once the racer crossed the finish line.</summary>
+    public bool Finished => collidedFinish;
+
+    private bool frozen;
+
+    /// <summary>True while the freeze buff holds this racer (it cannot move, steer, jump or knock anyone off).</summary>
+    public bool IsFrozen => frozen;
+
+    /// <summary>Freeze buff: stops the racer where it is (RaceBuffs holds its slide speed at 0) and pauses its animation.</summary>
+    public void SetFrozen(bool value)
+    {
+        frozen = value;
+        anim.speed = value ? 0f : 1f;
+        if (value)
+        {
+            characterModel.DOPause();
+        }
+        else
+        {
+            characterModel.DOPlay();
+        }
+    }
+
     /// <summary>Puts a racer that fell off the slide back on it at the given percent, riding normally again.</summary>
     public void ReturnToTrack(double percent)
     {
@@ -268,6 +291,11 @@ public class AiMover : MonoBehaviour
 
     public void Jump(float value)
     {
+        if (frozen)
+        {
+            return;   // frozen racers cannot be thrown off
+        }
+
         horizontalValue = value;
         horizontalTime = 0;
         anim.SetBool("inAir", true);

@@ -40,8 +40,29 @@ public class AiManager : MonoBehaviour
     [Tooltip("The boost also ends after this many seconds, whatever happens.")]
     [SerializeField] private float catchUpMaxSeconds = 15f;
 
+    [Header("Pacesetters")]
+    [Tooltip("Off = the AI behaves exactly as before (speeds re-rolled on every player landing, no pacesetters, old bump speed reset).")]
+    [SerializeField] private bool usePacesetters = true;
+    [Tooltip("AI racers that start on the front row and ride faster than the player, so the player has to jump to beat them.")]
+    [SerializeField] private int pacesetterCount = 2;
+    [Tooltip("Pacesetter speed over the player's normal speed (0.06 = +6%).")]
+    [SerializeField, Range(0f, 0.3f)] private float pacesetterBonusMin = 0.06f;
+    [SerializeField, Range(0f, 0.3f)] private float pacesetterBonusMax = 0.10f;
+    [Tooltip("Metres. A pacesetter this far ahead of the player slows to the player's normal speed, so a good jump can still catch it.")]
+    [SerializeField] private float pacesetterMaxLead = 120f;
+    [Tooltip("Metres before the max lead where the pacesetter starts easing off.")]
+    [SerializeField] private float pacesetterEaseZone = 30f;
+    [Tooltip("How fast (speed units per second) a pacesetter's speed changes when easing off or picking up again.")]
+    [SerializeField] private float pacesetterAcceleration = 3f;
+
+    private const float StartBoost = 20f;   // extra speed during the start boost (player, and pacesetters when on)
     private float[] baseSpeeds;      // each AI racer's normal speed, restored when its boost ends
     private float[] boostLeft;       // seconds of boost left (0 = not boosted)
+    private bool[] isPacesetter;
+    private float playerBaseSpeed;   // the player's speed without the start boost
+
+    /// <summary>True when the pacesetter system (and the AI fixes that come with it) is switched on.</summary>
+    public bool PacesettersEnabled => usePacesetters;
 
     /// <summary>The player's transform (the camera follows it).</summary>
     public Transform PlayerTransform => Player.transform;
@@ -57,6 +78,7 @@ public class AiManager : MonoBehaviour
     {
         baseSpeeds = new float[allAgents.Length];
         boostLeft = new float[allAgents.Length];
+        isPacesetter = new bool[allAgents.Length];
         for (int i = 0; i < allAgents.Length; i++)
         {
             baseSpeeds[i] = Random.Range(minSpeed, maxSpeed);
@@ -91,6 +113,66 @@ public class AiManager : MonoBehaviour
                 Player.splineFollower.followSpeed = initialSpeed;
                 playerBoostTime = false;
                 effects.windLines.SetActive(false);
+                EndPacesetterStartBoost();
+            }
+        }
+        else
+        {
+            UpdatePacesetters();
+        }
+    }
+
+    private bool IsPacesetter(int i) => usePacesetters && isPacesetter != null && isPacesetter[i];
+
+    /// <summary>
+    /// The front-most AI racers on the grid become pacesetters (the highest indices start furthest ahead, see InitAi).
+    /// </summary>
+    private void PickPacesetters()
+    {
+        for (int i = 0; i < allAgents.Length; i++)
+        {
+            isPacesetter[i] = usePacesetters && i >= allAgents.Length - pacesetterCount;
+        }
+    }
+
+    /// <summary>Pacesetters ride faster than the player, but ease off to the player's normal speed when far ahead.</summary>
+    private void UpdatePacesetters()
+    {
+        if (!usePacesetters || inLobby || GameManager.Instance == null || !GameManager.Instance.gameStarted || GameManager.Instance.gameOver)
+        {
+            return;
+        }
+
+        double playerProgress = TrackProgress(Player.splineFollower, Player.transform);
+        float length = RaceLength;
+        for (int i = 0; i < allAgents.Length; i++)
+        {
+            SplineFollower agent = allAgents[i];
+            if (!IsPacesetter(i) || !agent.follow || finishedAgents.Contains(agent))
+            {
+                continue;   // in the air or on the end spline: leave its speed alone
+            }
+
+            AiMover mover = agent.GetComponent<AiMover>();
+            if (mover != null && mover.IsFrozen)
+            {
+                continue;   // the freeze buff holds its speed at 0
+            }
+
+            float lead = (float)(agent.GetPercent() - playerProgress) * length;
+            float ease = Mathf.InverseLerp(pacesetterMaxLead - pacesetterEaseZone, pacesetterMaxLead, lead);
+            float target = Mathf.Lerp(baseSpeeds[i], playerBaseSpeed, ease);
+            agent.followSpeed = Mathf.MoveTowards(agent.followSpeed, target, pacesetterAcceleration * Time.deltaTime);
+        }
+    }
+
+    private void EndPacesetterStartBoost()
+    {
+        for (int i = 0; i < allAgents.Length; i++)
+        {
+            if (IsPacesetter(i) && allAgents[i].follow && !finishedAgents.Contains(allAgents[i]))
+            {
+                allAgents[i].followSpeed = baseSpeeds[i];
             }
         }
     }
@@ -176,6 +258,7 @@ public class AiManager : MonoBehaviour
         // race starts and it snaps over. Rebuild first so every racer stands on the real track during the countdown.
         Player.splineFollower.RebuildImmediate();
         Player.splineFollower.SetPercent(startPercent + startSpacing * (playerRow + 1));
+        PickPacesetters();
 
         for (int i = 0; i < allAgents.Length; i++)
         {
@@ -204,7 +287,8 @@ public class AiManager : MonoBehaviour
         Player.ShakeComplete();
         Player.splineFollower.follow = true;
         initialSpeed = Player.splineFollower.followSpeed;
-        Player.splineFollower.followSpeed += 20;
+        playerBaseSpeed = initialSpeed;
+        Player.splineFollower.followSpeed += StartBoost;
         playerBoostTime = true;
         RaceStats.BeginRace();
         effects.windLines.SetActive(true);
@@ -212,6 +296,13 @@ public class AiManager : MonoBehaviour
         for (int i = 0; i < allAgents.Length; i++)
         {
             allAgents[i].follow = true;
+            if (IsPacesetter(i))
+            {
+                // Faster than the player, and the same start boost, so the player cannot just ride past them at the start.
+                baseSpeeds[i] = playerBaseSpeed * (1f + Random.Range(pacesetterBonusMin, pacesetterBonusMax));
+                boostLeft[i] = 0f;
+                allAgents[i].followSpeed = baseSpeeds[i] + StartBoost;
+            }
         }
     }
 
@@ -238,9 +329,18 @@ public class AiManager : MonoBehaviour
                 continue;   // in the air: teleporting it would leave it flying from the new spot (ReturnFallenAgents handles falls)
             }
 
-            baseSpeeds[i] = Random.Range(minSpeed, maxSpeed);
-            allAgents[i].followSpeed = baseSpeeds[i];
-            boostLeft[i] = 0f;
+            bool pacesetter = IsPacesetter(i);
+            if (!pacesetter)
+            {
+                // With pacesetters on, every racer keeps the speed it rolled at the start, so fast ones can build a lead.
+                if (!usePacesetters)
+                {
+                    baseSpeeds[i] = Random.Range(minSpeed, maxSpeed);
+                }
+
+                allAgents[i].followSpeed = baseSpeeds[i];
+                boostLeft[i] = 0f;
+            }
 
             double agentPercent = allAgents[i].GetPercent();
             if (agentPercent >= playerPercent)
@@ -262,6 +362,11 @@ public class AiManager : MonoBehaviour
             if (target < gap)
             {
                 allAgents[i].SetPercent(playerPercent - target / length);
+            }
+
+            if (pacesetter)
+            {
+                continue;   // already faster than the player: no catch-up boost
             }
 
             allAgents[i].followSpeed = baseSpeeds[i] * (1f + Random.Range(catchUpBoostMin, catchUpBoostMax));
@@ -484,7 +589,17 @@ public class AiManager : MonoBehaviour
             }
 
             mover.ReturnToTrack(System.Math.Max(0.0, playerPercent - gap / length));
-            baseSpeeds[i] = Random.Range(minSpeed, maxSpeed);
+            if (IsPacesetter(i))
+            {
+                agent.followSpeed = baseSpeeds[i];   // keeps its pacesetter speed, no extra boost
+                continue;
+            }
+
+            if (!usePacesetters)
+            {
+                baseSpeeds[i] = Random.Range(minSpeed, maxSpeed);
+            }
+
             agent.followSpeed = baseSpeeds[i] * (1f + Random.Range(catchUpBoostMin, catchUpBoostMax));
             boostLeft[i] = catchUpMaxSeconds;
         }

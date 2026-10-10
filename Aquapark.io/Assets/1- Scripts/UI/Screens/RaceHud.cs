@@ -30,6 +30,7 @@ public class RaceHud : MonoBehaviour
     public GameObject comboChip;
     public TMP_Text comboText;
 
+    private BuffBar buffBar;   // placeholder buff buttons, built in code
     private readonly List<RectTransform> aiMarkers = new List<RectTransform>();
     private int shownRank = -1;
     private int shownTotal = -1;
@@ -43,6 +44,11 @@ public class RaceHud : MonoBehaviour
             wired = true;
             pauseButton.onClick.AddListener(() => UIManager.Instance.OpenPause());
             
+        }
+
+        if (buffBar == null)
+        {
+            buffBar = BuffBar.Create((RectTransform)transform, rankText.font);
         }
 
         SaveData.Changed += RefreshCoins;

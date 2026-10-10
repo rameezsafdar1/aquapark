@@ -64,7 +64,9 @@ public class PushHandler : MonoBehaviour
         else
         {
             float side = rightDot > 0f ? 1f : -1f;   // which side the AI racer is on
-            bool aiWins = push != null && !push.IsInAir && mainPlayer.CanBeKnockedOff && Random.value < knockOffChance;
+            // Frozen racers cannot knock anyone off, and a giant player cannot be knocked off.
+            bool aiWins = push != null && !push.IsInAir && !push.IsFrozen && !RaceBuffs.IsActive(BuffType.Giant) &&
+                          mainPlayer.CanBeKnockedOff && Random.value < knockOffChance;
             if (aiWins)
             {
                 // The player was not steering: the AI racer wins the side bump and throws the player off, away from it.

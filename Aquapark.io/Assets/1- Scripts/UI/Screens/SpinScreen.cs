@@ -186,17 +186,24 @@ public class SpinScreen : UIPanel
         {
             case Kind.Coins:
                 CurrencyManager.Add(RewardType.Coins, prize.amount);
-                ui.ShowReward(RewardType.Coins, prize.amount, "YOU WON");
+                ShowCurrencyPrize(RewardType.Coins, prize.amount);
                 break;
 
             case Kind.Gems:
                 CurrencyManager.Add(RewardType.Gems, prize.amount);
-                ui.ShowReward(RewardType.Gems, prize.amount, "YOU WON");
+                ShowCurrencyPrize(RewardType.Gems, prize.amount);
                 break;
 
             case Kind.Boost:
                 SaveData.CoinBoostRaces += 1;
-                ui.ShowToast("Next race pays double coins!");
+                if (ui.missionPacket != null)
+                {
+                    ui.OpenRewardPacket(ui.missionPacket.boostIcon, "DOUBLE COINS", "NEXT RACE", ui.missionPacket.spinTitle);
+                }
+                else
+                {
+                    ui.ShowToast("Next race pays double coins!");
+                }
                 break;
 
             default:
@@ -217,7 +224,16 @@ public class SpinScreen : UIPanel
                 if (!SkinManager.IsOwned(skin))
                 {
                     SkinManager.Grant(skin);
-                    UIManager.Instance.ShowToast("New skin: " + skin.displayName + "!");
+                    UIManager ui = UIManager.Instance;
+                    if (ui.missionPacket != null)
+                    {
+                        ui.OpenRewardPacket(skin.icon, skin.displayName.ToUpperInvariant(),
+                            skin.slot == SkinSlot.Floatie ? "NEW FLOATIE" : "NEW CHARACTER", ui.missionPacket.spinTitle);
+                    }
+                    else
+                    {
+                        ui.ShowToast("New skin: " + skin.displayName + "!");
+                    }
                     return;
                 }
             }
@@ -225,6 +241,21 @@ public class SpinScreen : UIPanel
 
         // The player already owns everything.
         CurrencyManager.Add(RewardType.Coins, SkinFallbackCoins);
-        UIManager.Instance.ShowReward(RewardType.Coins, SkinFallbackCoins, "YOU WON");
+        ShowCurrencyPrize(RewardType.Coins, SkinFallbackCoins);
+    }
+
+    /// <summary>Coins / gems prize: out of the reward packet, or the plain popup if the scene has no packet screen.</summary>
+    private static void ShowCurrencyPrize(RewardType type, int amount)
+    {
+        UIManager ui = UIManager.Instance;
+        MissionPacketScreen packet = ui.missionPacket;
+        if (packet == null)
+        {
+            ui.ShowReward(type, amount, "YOU WON");
+            return;
+        }
+
+        bool coins = type == RewardType.Coins;
+        ui.OpenRewardPacket(coins ? packet.coinIcon : packet.gemIcon, "+" + UIFormat.Number(amount), coins ? "COINS" : "GEMS", packet.spinTitle);
     }
 }

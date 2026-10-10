@@ -83,9 +83,13 @@ public class Locomotion : MonoBehaviour
 
     #endregion
 
+    private float baseModelScaleY;
+    private float ringBottom = float.NaN;
+
     private void Start()
     {
         initialSpeed = splineFollower.followSpeed;
+        baseModelScaleY = modelTransform.localScale.y;
     }
 
     private void Update()
@@ -177,8 +181,50 @@ public class Locomotion : MonoBehaviour
 
         // Full lean at the jump-off point (jumpThreshold is in the player's local units).
         rideBob.Remove(modelTransform);
-        SlideSurface.Follow(transform, modelTransform, groundLayer, edgeLeanAngle, jumpThreshold * transform.lossyScale.x);
+        SlideSurface.Follow(transform, modelTransform, groundLayer, edgeLeanAngle, jumpThreshold * transform.lossyScale.x, GrowthDrop());
         rideBob.Apply(modelTransform, splineFollower.followSpeed);
+    }
+
+    // The model is scaled around its pivot on the floor, but the ring sits above that pivot, so growing the model
+    // (giant buff) lifts the ring out of the water. Returns the metres to lower the model by so the ring stays put.
+    private float GrowthDrop()
+    {
+        float grow = modelTransform.localScale.y - baseModelScaleY;
+        if (Mathf.Abs(grow) < 0.001f)
+        {
+            return 0f;
+        }
+
+        if (float.IsNaN(ringBottom))
+        {
+            ringBottom = MeasureRingBottom();
+        }
+
+        return -ringBottom * grow * transform.lossyScale.y;
+    }
+
+    // Height of the riding floatie's lowest point above the model's pivot, in the model's unscaled local units
+    // (from the mesh bounds; the floatie meshes are not readable).
+    private float MeasureRingBottom()
+    {
+        GameObject floatie = _effects.FloatieModels[_effects.CurrentFloatie];
+        float lowest = float.MaxValue;
+        foreach (MeshFilter mf in floatie.GetComponentsInChildren<MeshFilter>(true))
+        {
+            if (mf.sharedMesh == null)
+            {
+                continue;
+            }
+
+            Bounds b = mf.sharedMesh.bounds;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                lowest = Mathf.Min(lowest, modelTransform.InverseTransformPoint(mf.transform.TransformPoint(corner)).y);
+            }
+        }
+
+        return lowest == float.MaxValue ? 0f : Mathf.Max(0f, lowest);
     }
 
     private void CheckForJumpOff()

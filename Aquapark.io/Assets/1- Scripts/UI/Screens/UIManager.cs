@@ -39,6 +39,8 @@ public class UIManager : MonoBehaviour
     [Header("Popups")]
     public SettingsPopup settings;
     public RewardPopup reward;
+    [Tooltip("Mission reward: packet tears open and the reward card comes out (Assets/2D/Subs Screen).")]
+    public MissionPacketScreen missionPacket;
     public ToastMessage toast;
 
     [Header("Race")]
@@ -71,7 +73,7 @@ public class UIManager : MonoBehaviour
         SkinManager.Initialise(floatieDatabase);
         SkinManager.Unlocked += OnItemUnlocked;
 
-        foreach (UIPanel panel in new UIPanel[] { shop, skins, spin, daily, vip, welcomeBack, purchaseFailed, settings, reward, results, pause, qualifier })
+        foreach (UIPanel panel in new UIPanel[] { shop, skins, spin, daily, vip, welcomeBack, purchaseFailed, settings, reward, missionPacket, results, pause, qualifier })
         {
             if (panel != null)
             {
@@ -405,6 +407,38 @@ public class UIManager : MonoBehaviour
         RefreshMenu();
     }
 
+    /// <summary>Plays the packet opening for a mission reward that has already been given.</summary>
+    public void OpenMissionPacket(MissionGrant grant)
+    {
+        if (state != State.Menu || missionPacket == null)
+        {
+            return;
+        }
+
+        Haptics.Pulse();
+        missionPacket.Play(grant);
+    }
+
+    /// <summary>Plays the packet opening for any reward that has already been given (e.g. a lucky spin prize).</summary>
+    public void OpenRewardPacket(Sprite icon, string amount, string label, string title, System.Action onClosed = null)
+    {
+        if (state != State.Menu || missionPacket == null)
+        {
+            return;
+        }
+
+        Haptics.Pulse();
+        missionPacket.Play(icon, amount, label, title, onClosed);
+    }
+
+    public void CloseMissionPacket()
+    {
+        if (missionPacket != null)
+        {
+            missionPacket.Hide();
+        }
+    }
+
     public void OpenSettings()
     {
         settings.Show();
@@ -449,6 +483,7 @@ public class UIManager : MonoBehaviour
         if (purchaseFailed != null) purchaseFailed.Hide(true);
         settings.Hide(true);
         reward.Hide(true);
+        if (missionPacket != null) missionPacket.Hide(true);
     }
 
     /// <summary>Shows exactly the parts of the menu that belong together: home, a page, or the daily popup.</summary>
@@ -475,6 +510,7 @@ public class UIManager : MonoBehaviour
             return;
         }
 
+        if (missionPacket != null && missionPacket.IsOpen) { missionPacket.Skip(); return; }
         if (reward.IsOpen) { reward.Hide(); return; }
         if (settings.IsOpen) { settings.Hide(); return; }
         if (purchaseFailed != null && purchaseFailed.IsOpen) { ClosePurchaseFailed(); return; }

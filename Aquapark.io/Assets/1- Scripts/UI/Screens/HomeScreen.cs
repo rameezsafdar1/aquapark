@@ -34,8 +34,7 @@ public class HomeScreen : MonoBehaviour
         missionButton.onClick.AddListener(OnMission);
     }
 
-    // Placeholder until the real mission card (with the packet animation) is connected: tap shows the active mission and its
-    // progress, or claims the reward when the mission is done.
+    // Tap shows the active mission and its progress, or opens the reward packet when the mission is done.
     private void OnMission()
     {
         UIManager ui = UIManager.Instance;
@@ -56,7 +55,8 @@ public class HomeScreen : MonoBehaviour
 
     /// <summary>
     /// Gives the finished mission's reward. Called by UIManager when the menu opens with a reward waiting (e.g. right after
-    /// the first race) and by tapping the card. Placeholder: the imported mission card's packet animation goes here.
+    /// the first race) and by tapping the card. Plays the packet opening (MissionPacketScreen), or the plain reward
+    /// popup when the scene has no packet screen.
     /// </summary>
     public void ShowMissionReward()
     {
@@ -67,6 +67,12 @@ public class HomeScreen : MonoBehaviour
 
         UIManager ui = UIManager.Instance;
         MissionGrant grant = MissionManager.ClaimReward();
+        if (ui.missionPacket != null)
+        {
+            ui.OpenMissionPacket(grant);
+            return;
+        }
+
         switch (grant.kind)
         {
             case MissionRewardKind.Coins: ui.ShowReward(RewardType.Coins, grant.amount, "MISSION COMPLETE"); break;

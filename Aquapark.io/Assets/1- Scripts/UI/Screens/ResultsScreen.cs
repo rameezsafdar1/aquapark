@@ -64,6 +64,13 @@ public class ResultsScreen : UIPanel
 
         baseGems = failed ? 0 : rank == 1 ? 2 : rank == 2 ? 1 : 0;
 
+        // 2x rewards buff: coins and gems of this race are doubled.
+        if (!failed && RaceBuffs.DoubleRewards)
+        {
+            baseCoins *= 2;
+            baseGems *= 2;
+        }
+
         ribbonText.text = failed ? "YOU FELL!" : UIFormat.Ordinal(rank).ToUpperInvariant() + " PLACE!";
         board.SetActive(!failed);
         coinReward.SetActive(!failed);

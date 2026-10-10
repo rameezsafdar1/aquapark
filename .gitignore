@@ -72,3 +72,7 @@ crashlytics-build.properties
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 figma_token.txt
 figma_data/
+
+# Unity crash-recovery scene backups
+**/Assets/_Recovery/
+**/Assets/_Recovery.meta
