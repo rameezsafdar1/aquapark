@@ -728,3 +728,127 @@ Every change made in this project is logged here (newest at the bottom).
   8.4 so the extra line fits inside the box.
 - Applied in place (only the two Close objects replaced, fail-safe legal text/template updated) - neither panel was
   rebuilt, nothing else touched. Scene saved with only Menu active; verified with AquaUIShot captures.
+
+== 2026-10-09 - Mission reward packet animation ==
+- Request: when a mission is complete, replace the reward popup with a packet animation on its own screen: the packet
+  comes up, wobbles, stretches out to the sides from the centre, squeezes, tears open, and a card comes out showing the
+  reward (icon + amount). Art from Assets/2D/Subs Screen: Packet.png, packet top.png, card.png (the user's old code was lost).
+- NEW 1- Scripts/UI/Screens/MissionPacketScreen.cs (UIPanel): one DOTween sequence. Packet flies up -> wobble (punch
+  rotate/scale) -> stretch (x 1.2, y 0.88) -> squeeze (x 0.84, y 1.12) -> tear (top flies off up-right and fades, white
+  flash, haptic) -> card slides up out of the opening -> card moves to the front and the middle at full size, packet drops
+  away, rotating glow rays behind it, icon punch -> "TAP TO CONTINUE". Tapping during the packet part speeds it up (x3);
+  tapping on the card closes it. Back button does the same. Card shows coins/gems (+amount), free spins (spin wheel
+  icon), or a skin (its icon + name, NEW CHARACTER / NEW FLOATIE). Timing/feel values are Inspector fields.
+- The card starts as a child of the packet (behind the packet picture) so it squashes with it and stays hidden until
+  the tear; TakeCardOut re-parents it to the page in front of the packet.
+- NEW Editor/AquaUI/AquaUIBuilder.MissionPacket.cs + menu Aquapark > UI > Rebuild Mission Packet Only (single-panel
+  rebuild, placed right after Reward). Generated art in Assets/UI/MissionPacket: mission_card.png (card.png had the
+  transparency checkerboard painted in - cut out with a flood fill from the border plus the closed gaps between the
+  characters' arms/antennae), mission_packet_top.png (the top 264 rows of 'packet top.png', full width so it lines up
+  with Packet.png), mission_rays.png (glow). Original source images untouched.
+- HomeScreen.ShowMissionReward: claims the reward, then UIManager.OpenMissionPacket(grant); the old reward popup/toast
+  is only used if the scene has no packet screen. UIManager: missionPacket field, Open/CloseMissionPacket, hidden on
+  start and in CloseAllMenuPanels, Back handling.
+- Ran RebuildMissionPacket in gameplay.unity and saved (panel inactive, only Menu active). Verified in Play mode: frame
+  captures of every stage, real-time run ends with the card centred (+25 GEMS), tap closes it, and the full flow
+  (DebugCompleteCurrent -> ShowMissionReward) plays it and moves to the next mission (test save moved back one mission after).
+
+== 2026-10-09 - Lucky spin prizes through the packet + packet sounds ==
+- Request: wheel prizes should come out of the packet too; turn the background music down during the packet animation,
+  play the new reward sound when the card comes out and the tear-paper sound when the packet tears.
+- MissionPacketScreen: new Play(icon, amount, label, title) for any reward (mission Play still takes a MissionGrant);
+  spinTitle "YOU WON!", boostIcon (spin_prize4, the x2 bolt). Music ducked on open, restored on close (and in OnDisable,
+  so it can never stay quiet). Sfx.TearPaper at the tear, Sfx.Reward when the card comes out.
+- UIManager.OpenRewardPacket(icon, amount, label, title). SpinScreen.Finish: coins/gems ("+100 COINS"), double coins
+  ("DOUBLE COINS / NEXT RACE") and skins (skin icon + name, NEW CHARACTER / NEW FLOATIE) now open the packet; the old
+  popup/toast is kept only as a fallback when the scene has no packet screen.
+- AudioManager: Sfx enum + Reward, TearPaper (added at the end so existing entries keep their ids); DuckMusic(bool) fades
+  the music to duckedVolume (25 % of its own volume) over duckFadeTime 0.35 s. Scene's "== Audio Manager" got the two
+  entries: Assets/SFX/reward.mp3 and Assets/SFX/tear paper.mp3 (volume 1). Scene saved.
+- Verified in Play mode: spin page open -> boost prize packet plays over it, music 0.25 -> 0.0625 while open,
+  back to 0.25 after the tap, spin page still open underneath.
+
+== 2026-10-09 - New end-zone pool interior (no longer a copy of aquapark.io) ==
+- Request: the pool interior in the end zone was an exact copy of Voodoo's aquapark.io (small blue mosaic walls,
+  lane stripes on the floor, mosaic rim); replace it with our own look, with a pool tile design on the sides.
+- New assets in Assets/Tracks/Templates/Pool/ (textures generated in code):
+  PoolWall_Tropical.png/.mat (long walls, tiling 4x1) + PoolWall_Tropical_Short.mat (short walls, tiling 3x1, so the
+  ~0.6 m square tiles stay square on both): ceramic tiles with white grout, per-tile shade variation, darker accent rows,
+  turquoise -> deep teal depth gradient, and a white/coral wave border with a yellow trim at the waterline.
+  PoolFloor_Sun.png/.mat: big coral/yellow sun on turquoise with a white frame (aspect-corrected for the 50 x 38 m floor).
+  PoolCoping.mat: warm white stone for the rim.
+- EndZone.prefab, Pool (1): 24 PlaneWall renderers -> wall materials, wall1-4 rim -> PoolCoping, both floors ->
+  PoolFloor_Sun, the 20 lane-stripe "block" cubes switched off (not deleted). No transforms/colliders changed, so the
+  dive, end spline and camera are unaffected. All 50 levels pick this up through the nested EndZone.
+- Not changed: the pool water surface (BasicWater2, white caustic pattern) and gameplay.unity's own Level (1) pool,
+  which still uses the old Poolwall materials.
+
+== 2026-10-10 - Race buffs (Speed / Giant / Freeze / 2x Rewards) with placeholder buttons ==
+- Request: 4 buffs, only one usable per race - pressing one button locks all four. Placeholder UI for now.
+- NEW Assets/1- Scripts/Buffs/RaceBuffs.cs: per-race manager (created on first use, gone with the scene reload).
+  BuffType enum; TryUse() only while the race is on and no buff used yet. Speed = player slide speed x1.5 for 5 s
+  (+ wind lines); Giant = player Character (model + floatie + push sphere) scaled x2 for 5 s with a grow/shrink tween,
+  and AI cannot knock a giant player off; Freeze = every AI racer held at speed 0, animation paused, no steering /
+  jumping / knock-offs, for 5 s; 2x Rewards = coins and gems on the results screen doubled for this race.
+  Speeds are overridden through a SpeedHold that picks up other scripts' followSpeed changes (start boost, bumps,
+  AI catch-up) as the new base, so the right speed comes back when the buff ends. Tunables are public fields
+  (duration, speedMultiplier, giantScale, giantTweenSeconds).
+- NEW Assets/1- Scripts/Buffs/BuffBar.cs: PLACEHOLDER buttons built in code under the race HUD (bottom row, 4 coloured
+  squares). Locked during the countdown; after a press all four grey out, the used one shows a draining timer / "2X ON".
+  No scene edit needed (RaceHud creates it in OnEnable).
+- Changed: AiMover (SetFrozen/IsFrozen/Finished, Update + Jump skipped while frozen), AiPush (IsFrozen),
+  PushHandler (frozen AI / giant player = no knock-off), ResultsScreen (2x rewards), RaceHud (creates BuffBar).
+- Verified in Play mode via MCP: Giant x2 fits the tube (screenshot), shrinks back after 5 s; Freeze stopped all 11 AI
+  and restored their speeds; Speed 44 -> 66 -> 44; a second buff is refused. 2x rewards not played to the end of a race.
+  gameplay.unity not modified.
+
+== 2026-10-10 - AI pacesetters (2 racers that out-run a player who never jumps) ==
+- Request: AI barely left the player behind; a few should, so jumping the slide is worth it. All behind one switch.
+- Causes found: AI speeds averaged below the player's; SetAiDynamically re-rolled EVERY AI's speed on each player
+  landing (fast leaders lost their edge); the player's +20 start boost rode past the front row; AiPush restored a speed
+  cached in Start() after a bump, wiping catch-up boosts / re-rolls.
+- AiManager: new "Pacesetters" inspector section. usePacesetters (OFF = exactly the old behaviour), pacesetterCount 2,
+  pacesetterBonusMin/Max 0.06-0.10 (speed over the player's base speed), pacesetterMaxLead 120 m, pacesetterEaseZone
+  30 m, pacesetterAcceleration 3. The front-most grid racers become pacesetters, get the same start boost as the player,
+  then ride faster than the player; within the ease zone of the max lead they slow to the player's base speed, so a
+  good jump can always catch them. No catch-up boost/re-roll for them (they can still be moved behind the camera after
+  a big jump, and return from falls at their own speed). Frozen / airborne / finished pacesetters are left alone.
+  With the switch on, the other AI keep the speed they rolled at race start instead of re-rolling on every landing.
+- AiPush (switch on only): when a bump ends, only the bump amount is taken back; the timer pauses while frozen.
+- Verified in Play mode: player 3rd after the start with only the 2 pacesetters ahead (+44/+59 m -> +68/+84 m 8 s
+  later, ~47 vs player 44); in a run where the player fell, both eased to exactly 44 at the lead cap. No console errors.
+
+== 2026-10-10 - Fix: player floats above the water during the Giant buff ==
+- Cause: Giant scales the player's Character model x2 around its pivot (on the slide floor), but the floatie sits
+  above that pivot, so its bottom rose with the scale (measured ~1.14 m -> ~2.0 m above the floor, ~0.9 m out of the
+  water). The Speed buff does not change the height (checked at speed 64 vs 44: same ring height).
+- Locomotion: new GrowthDrop() lowers the model by ringBottom x (scale growth) while the model is bigger than at Start
+  (ring bottom measured once from the riding floatie's mesh bounds, like AiMover.MeasureRing). Passed to
+  SlideSurface.Follow through a new optional heightOffset parameter (default 0, so the AI and other callers are unchanged).
+- Verified in Play mode: ring bottom stays at ~1.1 m above the floor before, during and after Giant (model local Y
+  -0.18 while giant, back to ~0 after). Only measured on the floor centre; on the steep wall the correction is along
+  the track's up, so a slight (~10 cm) mismatch may remain at full tilt.
+
+== 2026-10-10 - Speed buff lasts 10 s (own setting) + Race Buffs object in the scene ==
+- RaceBuffs: new speedDuration (10 s) for the Speed buff; `duration` (5 s) now covers Giant and Freeze. New TotalTime
+  property (length of the running buff); BuffBar's draining timer uses it instead of `duration`.
+- RaceBuffs was created in code on first use (to avoid an editor save of gameplay.unity, which rewrites Level (1)'s
+  embedded meshes), so it could not be tuned in the inspector. Now gameplay.unity has a root "Race Buffs" GameObject
+  with the RaceBuffs component (added by editing the scene YAML: fileIDs 1700000101-103 + a SceneRoots entry), and
+  RaceBuffs.Instance uses it; it still creates one with default values if a scene has none.
+- Verified in Play mode: one RaceBuffs (the scene's), Speed ran 10 s at 66 (44 x 1.5) then back to 44. Scene not dirty.
+
+== 2026-10-10 - PC window size drop down (9:16 portrait sizes) ==
+- NEW Assets/1- Scripts/UI/Core/WindowSizeMenu.cs, compiled only for standalone (#if UNITY_STANDALONE), so mobile
+  builds never contain it. It spawns itself (RuntimeInitializeOnLoadMethod + DontDestroyOnLoad): no scene or
+  prefab edits, gameplay.unity untouched.
+- Small rounded drop down in the top-left of the home screen (own overlay canvas, 390x844 ref, match height, sort
+  order 5000). Options are 9:16 sizes 360x640, 405x720, 450x800, 540x960, 608x1080, 720x1280, 810x1440, 900x1600,
+  1080x1920, filtered to the ones that fit the monitor (desktop height - 90 px for title/task bar; a 1080p
+  monitor gets up to 540x960). Picking one calls Screen.SetResolution(w, h, Windowed), saves it in PlayerPrefs
+  ("WindowSizeHeight") and re-applies it on next launch.
+- Shown only in the Menu state with no UIPanel open (hidden during races, results, offers, shop, popups); clicking
+  outside closes the list.
+- Verified in Play mode (active build target is StandaloneWindows64, so it shows in the Editor too, but the
+  Game view ignores SetResolution - test the resize in a PC build): hidden while Welcome Back was open, visible on
+  home, 4 options on the 1920x1080 desktop. No new console errors, scene not dirty.
